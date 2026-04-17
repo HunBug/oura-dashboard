@@ -7,6 +7,11 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/Dotnet.gitignore
 
+# Local setti
+.env
+appsettings.*.Local.json
+appsettings.json
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/

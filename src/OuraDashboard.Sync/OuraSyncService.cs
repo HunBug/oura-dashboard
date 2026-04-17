@@ -98,8 +98,8 @@ public class OuraSyncService(
     private async Task<int> SyncDailySleepAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var doc = await api.FetchDailyAsync("daily_sleep", start, end, ct);
-        if (doc is null) { errors.Add("daily_sleep: fetch failed"); return 0; }
+        var (doc, notFound) = await api.FetchDailyAsync("daily_sleep", start, end, ct);
+        if (doc is null) { if (!notFound) errors.Add("daily_sleep: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
             ? data.EnumerateArray().ToList()
@@ -155,8 +155,8 @@ public class OuraSyncService(
     private async Task<int> SyncSleepSessionsAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var doc = await api.FetchDailyAsync("sleep", start, end, ct);
-        if (doc is null) { errors.Add("sleep: fetch failed"); return 0; }
+        var (doc, notFound) = await api.FetchDailyAsync("sleep", start, end, ct);
+        if (doc is null) { if (!notFound) errors.Add("sleep: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
             ? data.EnumerateArray().ToList()
@@ -176,8 +176,8 @@ public class OuraSyncService(
                 var entity = existing ?? new SleepSession { UserId = user.Id };
                 entity.OuraId = ouraId;
                 entity.Day = day;
-                entity.BedtimeStart = DateTimeOffset.Parse(item.GetProperty("bedtime_start").GetString()!);
-                entity.BedtimeEnd   = DateTimeOffset.Parse(item.GetProperty("bedtime_end").GetString()!);
+                entity.BedtimeStart = DateTimeOffset.Parse(item.GetProperty("bedtime_start").GetString()!).ToUniversalTime();
+                entity.BedtimeEnd   = DateTimeOffset.Parse(item.GetProperty("bedtime_end").GetString()!).ToUniversalTime();
 
                 entity.AverageBreath      = GetNullableDouble(item, "average_breath");
                 entity.AverageHeartRate   = GetNullableDouble(item, "average_heart_rate");
@@ -228,8 +228,8 @@ public class OuraSyncService(
     private async Task<int> SyncReadinessAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var doc = await api.FetchDailyAsync("daily_readiness", start, end, ct);
-        if (doc is null) { errors.Add("daily_readiness: fetch failed"); return 0; }
+        var (doc, notFound) = await api.FetchDailyAsync("daily_readiness", start, end, ct);
+        if (doc is null) { if (!notFound) errors.Add("daily_readiness: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
             ? data.EnumerateArray().ToList()
@@ -285,14 +285,32 @@ public class OuraSyncService(
     private async Task<int> SyncHeartRateAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var doc = await api.FetchHeartRateAsync(start, end, ct);
-        if (doc is null) { errors.Add("heartrate: fetch failed"); return 0; }
+        // Oura heartrate endpoint has a ~30-day window limit; chunk accordingly.
+        const int ChunkDays = 30;
+        var allItems = new List<JsonElement>();
 
-        var items = doc.RootElement.TryGetProperty("data", out var data)
-            ? data.EnumerateArray().ToList()
-            : [];
+        var chunkStart = start;
+        while (chunkStart <= end)
+        {
+            var chunkEnd = chunkStart.AddDays(ChunkDays - 1);
+            if (chunkEnd > end) chunkEnd = end;
 
-        // Bulk upsert: fetch existing timestamps for range, then insert only new ones
+            var (doc, notFound) = await api.FetchHeartRateAsync(chunkStart, chunkEnd, ct);
+            if (doc is null)
+            {
+                if (!notFound) errors.Add($"heartrate: fetch failed ({chunkStart:yyyy-MM-dd}–{chunkEnd:yyyy-MM-dd})");
+            }
+            else if (doc.RootElement.TryGetProperty("data", out var data))
+            {
+                allItems.AddRange(data.EnumerateArray());
+            }
+
+            chunkStart = chunkEnd.AddDays(1);
+        }
+
+        if (allItems.Count == 0) return 0;
+
+        // Bulk upsert: fetch existing timestamps for full range, then insert only new ones.
         var startDto = new DateTimeOffset(start.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var endDto   = new DateTimeOffset(end.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
 
@@ -304,11 +322,11 @@ public class OuraSyncService(
         var toInsert = new List<HeartRateSample>();
         int updateCount = 0;
 
-        foreach (var item in items)
+        foreach (var item in allItems)
         {
             try
             {
-                var timestamp = DateTimeOffset.Parse(item.GetProperty("timestamp").GetString()!);
+                var timestamp = DateTimeOffset.Parse(item.GetProperty("timestamp").GetString()!).ToUniversalTime();
                 var bpm = item.GetProperty("bpm").GetInt32();
                 var source = item.TryGetProperty("source", out var s) ? s.GetString() : null;
 
@@ -355,8 +373,8 @@ public class OuraSyncService(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end,
         string endpoint, List<string> errors, CancellationToken ct)
     {
-        var doc = await api.FetchDailyAsync(endpoint, start, end, ct);
-        if (doc is null) { errors.Add($"{endpoint}: fetch failed"); return 0; }
+        var (doc, notFound) = await api.FetchDailyAsync(endpoint, start, end, ct);
+        if (doc is null) { if (!notFound) errors.Add($"{endpoint}: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
             ? data.EnumerateArray().ToList()
@@ -398,9 +416,9 @@ public class OuraSyncService(
         var entity = existing ?? new DailyStress { UserId = user.Id };
         entity.OuraId = ouraId;
         entity.Day = day;
-        entity.StressHigh    = GetNullableInt(item, "stress_high");
-        entity.RecoveryHigh  = GetNullableInt(item, "recovery_high");
-        entity.DaytimeStress = GetNullableInt(item, "day_summary");
+        entity.StressHigh   = GetNullableInt(item, "stress_high");
+        entity.RecoveryHigh = GetNullableInt(item, "recovery_high");
+        // day_summary is a string enum ("restored", "normal", "stressful") — stored in RawJson only
         existing?.RawJson.Dispose();
         entity.RawJson = JsonDocument.Parse(rawText);
         if (existing is null) db.DailyStresses.Add(entity);

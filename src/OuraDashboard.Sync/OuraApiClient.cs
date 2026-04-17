@@ -21,7 +21,8 @@ public class OuraApiClient
     }
 
     /// <summary>Fetch a date-ranged endpoint that uses start_date / end_date query params.</summary>
-    public Task<JsonDocument?> FetchDailyAsync(
+    /// <returns>Parsed document, or null. IsNotFound=true means the endpoint isn't in your Oura plan (404).</returns>
+    public Task<(JsonDocument? Doc, bool IsNotFound)> FetchDailyAsync(
         string endpoint, DateOnly start, DateOnly end, CancellationToken ct = default)
     {
         var url = $"{BaseUrl}/{endpoint}?start_date={start:yyyy-MM-dd}&end_date={end:yyyy-MM-dd}";
@@ -29,7 +30,8 @@ public class OuraApiClient
     }
 
     /// <summary>Fetch the heartrate endpoint which uses datetime params.</summary>
-    public Task<JsonDocument?> FetchHeartRateAsync(
+    /// <returns>Parsed document, or null. IsNotFound=true means the endpoint isn't in your Oura plan (404).</returns>
+    public Task<(JsonDocument? Doc, bool IsNotFound)> FetchHeartRateAsync(
         DateOnly start, DateOnly end, CancellationToken ct = default)
     {
         var url = $"{BaseUrl}/heartrate" +
@@ -38,25 +40,31 @@ public class OuraApiClient
         return FetchAsync(url, ct);
     }
 
-    private async Task<JsonDocument?> FetchAsync(string url, CancellationToken ct)
+    private async Task<(JsonDocument? Doc, bool IsNotFound)> FetchAsync(string url, CancellationToken ct)
     {
         try
         {
             var response = await _http.GetAsync(url, ct);
 
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogDebug("Oura API: endpoint not available (404) — {Url}", url);
+                return (null, true);
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Oura API returned {Status} for {Url}", (int)response.StatusCode, url);
-                return null;
+                return (null, false);
             }
 
             var stream = await response.Content.ReadAsStreamAsync(ct);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return (await JsonDocument.ParseAsync(stream, cancellationToken: ct), false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to fetch {Url}", url);
-            return null;
+            return (null, false);
         }
     }
 }
