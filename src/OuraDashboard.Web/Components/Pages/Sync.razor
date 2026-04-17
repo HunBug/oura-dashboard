@@ -1,0 +1,102 @@
+@page "/sync"
+@rendermode InteractiveServer
+@implements IDisposable
+
+@inject ISyncTrigger SyncTrigger
+
+<PageTitle>Sync</PageTitle>
+
+<h1>Sync</h1>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="RequestSync" disabled="@_state.IsRunning">
+        @if (_state.IsRunning)
+        {
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span>Syncing&hellip;</span>
+        }
+        else
+        {
+            <span>Refresh now</span>
+        }
+    </button>
+</div>
+
+<dl class="row" style="max-width: 480px">
+    <dt class="col-5">Status</dt>
+    <dd class="col-7">@(_state.IsRunning ? "Running" : "Idle")</dd>
+
+    <dt class="col-5">Last sync</dt>
+    <dd class="col-7">@(_state.LastSyncAt.HasValue ? _state.LastSyncAt.Value.ToLocalTime().ToString("g") : "—")</dd>
+</dl>
+
+@if (_state.LastResults.Count > 0)
+{
+    <h2 class="h5 mt-3">Last results</h2>
+    <table class="table table-sm" style="max-width: 760px">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Range</th>
+                <th>DailySleep</th>
+                <th>Sessions</th>
+                <th>Readiness</th>
+                <th>Activity</th>
+                <th>HR samples</th>
+                <th>Errors</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in _state.LastResults)
+            {
+                <tr>
+                    <td>@r.UserName</td>
+                    <td>@r.Start – @r.End</td>
+                    <td>@r.DailySleepCount</td>
+                    <td>@r.SleepSessionCount</td>
+                    <td>@r.ReadinessCount</td>
+                    <td>@r.DailyActivityCount</td>
+                    <td>@r.HeartRateSampleCount</td>
+                    <td>@r.Errors.Count</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_state.LastErrors.Count > 0)
+{
+    <div class="alert alert-danger mt-3">
+        <strong>Errors</strong>
+        <ul class="mb-0 mt-1">
+            @foreach (var err in _state.LastErrors)
+            {
+                <li>@err</li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    private SyncState _state = new();
+    private Timer? _pollTimer;
+
+    protected override void OnInitialized()
+    {
+        _state = SyncTrigger.State;
+        // Poll every 2 s so the spinner/results update without needing StreamRendering
+        _pollTimer = new Timer(async _ =>
+        {
+            _state = SyncTrigger.State;
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+    }
+
+    private void RequestSync()
+    {
+        SyncTrigger.RequestSync();
+        _state = SyncTrigger.State;
+    }
+
+    public void Dispose() => _pollTimer?.Dispose();
+}
