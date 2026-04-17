@@ -238,3 +238,67 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 7. **Web: overview dashboard** — sparklines, side-by-side table
 8. **Web: per-user deep-dive** — charts, custom metrics, cycle overlay
 9. **Deployment** — systemd unit file, full Docker Compose variant
+
+---
+
+## Implementation status (last updated: 2026-04-17)
+
+### ✅ Done
+
+- Solution scaffold: `OuraDashboard.slnx` (4 projects, project references, `.slnx` format — .NET 10 default)
+- Central Package Management via `Directory.Packages.props` — all NuGet versions pinned there, no `Version=` in `.csproj` files
+- `Directory.Build.props` with `<AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>` (.NET 10 workaround)
+- EF Core 10.0.4 + Npgsql.EF 10.0.1 (pinned to avoid `MSB3277` version conflict; `dotnet-ef` global tool also at 10.0.6)
+- All 9 EF Core entities in `src/OuraDashboard.Data/Entities/`
+- `OuraDbContext` with Fluent API (JSONB columns, unique indexes, FK)
+- `OuraDbContextFactory` for design-time migrations
+- `InitialSchema` migration created and applied
+- `docker-compose.yml` — Postgres 17 on port 5433, healthcheck, `pgdata` volume
+- `OuraOptions` config model (`SectionName = "Oura"`, `Users`, `SyncIntervalMinutes`, `SyncLookbackDays`)
+- `OuraApiClient` — thin HTTP wrapper, returns `(JsonDocument? Doc, bool IsNotFound)` tuple
+- `OuraSyncService` — syncs all 8 endpoints per user, upsert on natural keys, returns `SyncResult`
+- `ISyncTrigger` / `SyncState` / `SyncBackgroundService` — timer + `Channel<bool>` manual trigger
+- `Sync.ServiceCollectionExtensions` — `AddOuraSync(addBackgroundService: bool)`
+- `Data.ServiceCollectionExtensions` — `AddOuraDatabase(connectionString)`
+- `Sync.Cli/Program.cs` — `--days N`, `--migrate` flags
+- **End-to-end sync verified with real Oura tokens** — 90 days of data for both users
+
+### ❌ Not started yet
+
+- `src/OuraDashboard.Web/Program.cs` — needs `AddOuraDatabase()`, `AddOuraSync(addBackgroundService: true)`, `Configure<OuraOptions>()`
+- All Blazor pages: `/sync`, `/raw`, `/`, `/user/{name}`, `/compare`
+- Chart.js JS interop setup
+- Deployment: systemd unit, `docker-compose.full.yml`
+
+---
+
+## Known API quirks and implementation notes
+
+### Oura API gotchas
+
+| Issue | Fix |
+|---|---|
+| `daily_hrv` and `vo2_max` return **404** on free Oura tier | `OuraApiClient` returns `(null, isNotFound: true)` — callers skip silently without counting as an error |
+| `heartrate` endpoint returns **400** for date ranges >30 days | `SyncHeartRateAsync` fetches in 30-day chunks (`const ChunkDays = 30`), accumulates items, then does single upsert pass |
+| `bedtime_start` / `bedtime_end` in sleep sessions have **local timezone offsets** (e.g. `+03:00`) | Call `.ToUniversalTime()` before assigning to entity — Npgsql only accepts UTC for `timestamptz` |
+| Heart rate sample `timestamp` also has local offset | Same fix — `.ToUniversalTime()` |
+| `daily_stress.day_summary` is a **string enum** (`"restored"`, `"normal"`, `"stressful"`), not an int | Not extracted to a scalar column (stored in `RawJson` only). `DailyStress.DaytimeStress` column exists but is unused — can add a `string? DaySummary` column + migration when needed |
+
+### Build/tooling notes
+
+- Use `dotnet new blazor --interactivity Server --no-https` (NOT `blazorserver` — template was renamed in .NET 10)
+- Always `dotnet clean` before rebuild if EF Core package version changes (stale binaries cause `MSB3277`)
+- `appsettings.json` at repo root is loaded by both Web and Sync.Cli (both use `Host.CreateDefaultBuilder` / `WebApplication.CreateBuilder`)
+- `appsettings.Local.json` is gitignored — real tokens go there
+
+### Next implementation step: wire up `OuraDashboard.Web/Program.cs`
+
+```csharp
+// In src/OuraDashboard.Web/Program.cs, after var builder = WebApplication.CreateBuilder(args):
+builder.Services.Configure<OuraOptions>(builder.Configuration.GetSection(OuraOptions.SectionName));
+builder.Services.AddOuraDatabase(builder.Configuration.GetConnectionString("Default")!);
+builder.Services.AddOuraSync(addBackgroundService: true);
+```
+
+Then build the `/sync` page first (simplest — just reads `ISyncTrigger.State` and calls `RequestSync()`).
+
