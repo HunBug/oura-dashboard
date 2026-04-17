@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OuraDashboard.Sync\OuraDashboard.Sync.csproj" />
     <ProjectReference Include="..\OuraDashboard.Data\OuraDashboard.Data.csproj" />
   </ItemGroup>

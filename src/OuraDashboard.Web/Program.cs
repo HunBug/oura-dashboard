@@ -1,3 +1,4 @@
+using ApexCharts;
 using OuraDashboard.Data;
 using OuraDashboard.Sync;
 using OuraDashboard.Web.Components;
@@ -11,6 +12,8 @@ builder.Services.AddRazorComponents()
 builder.Services.Configure<OuraOptions>(builder.Configuration.GetSection(OuraOptions.SectionName));
 builder.Services.AddOuraDatabase(builder.Configuration.GetConnectionString("Default")!);
 builder.Services.AddOuraSync(addBackgroundService: true);
+builder.Services.AddApexCharts();
+builder.Services.AddScoped<OuraDashboard.Web.Services.DashboardQueryService>();
 
 var app = builder.Build();
 

@@ -5,6 +5,10 @@
     <ProjectReference Include="..\OuraDashboard.Data\OuraDashboard.Data.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Blazor-ApexCharts" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
