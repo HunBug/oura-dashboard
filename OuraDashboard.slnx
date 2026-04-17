@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OuraDashboard.Data/OuraDashboard.Data.csproj" />
+    <Project Path="src/OuraDashboard.Sync.Cli/OuraDashboard.Sync.Cli.csproj" />
+    <Project Path="src/OuraDashboard.Sync/OuraDashboard.Sync.csproj" />
+    <Project Path="src/OuraDashboard.Web/OuraDashboard.Web.csproj" />
+  </Folder>
+</Solution>

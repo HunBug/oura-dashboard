@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Workaround for .NET 10 preview prune package data issue -->
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+  </PropertyGroup>
+</Project>
