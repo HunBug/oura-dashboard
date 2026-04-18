@@ -1,0 +1,206 @@
+@page "/user/{Name}"
+@rendermode InteractiveServer
+
+@inject DashboardQueryService Query
+
+<PageTitle>@Name — Detail</PageTitle>
+
+@if (_loading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (_overview is null || _overview.Rows.Count == 0)
+{
+    <h2>@Name</h2>
+    <p class="text-muted">No data found for this user.</p>
+}
+else
+{
+    <div class="d-flex align-items-center mb-4 gap-3">
+        <a href="/" class="btn btn-sm btn-outline-secondary">← Overview</a>
+        <h2 class="mb-0">@Name — last 30 days</h2>
+    </div>
+
+    @* ── Aggregate stats ── *@
+    <div class="row text-center mb-4 g-3">
+        <StatBox Label="Sleep score"  Value="@Fmt(AvgScore)" />
+        <StatBox Label="Readiness"    Value="@Fmt(AvgReadiness)" />
+        <StatBox Label="HRV (ms)"     Value="@Fmt(AvgHrv)" />
+        <StatBox Label="Nocturnal HR" Value="@FmtD(AvgHr)" />
+        <StatBox Label="Lowest HR"    Value="@Fmt(AvgLowestHr)" />
+        <StatBox Label="Resp (brpm)"  Value="@FmtD(AvgBreath)" />
+        <StatBox Label="Deep (min)"   Value="@Fmt(AvgDeep)" />
+        <StatBox Label="REM (min)"    Value="@Fmt(AvgRem)" />
+        <StatBox Label="Awake (min)"  Value="@Fmt(AvgAwake)" />
+    </div>
+
+    @* ── Charts ── *@
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header text-muted small">Sleep score &amp; Readiness</div>
+                <div class="card-body p-2">
+                    <ApexChart TItem="DailyOverviewRow" Options="_scoreOpts" Height="180">
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Sleep"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => r.SleepScore" />
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Readiness"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => r.ReadinessScore" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header text-muted small">HRV (ms)</div>
+                <div class="card-body p-2">
+                    <ApexChart TItem="DailyOverviewRow" Options="_baseOpts" Height="180">
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="HRV"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => r.AvgHrv" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header text-muted small">Nocturnal HR &amp; Lowest HR</div>
+                <div class="card-body p-2">
+                    <ApexChart TItem="DailyOverviewRow" Options="_baseOpts" Height="180">
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Avg HR"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => (decimal?)r.AvgHr" />
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Lowest HR"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => r.LowestHr" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header text-muted small">Respiratory rate (brpm)</div>
+                <div class="card-body p-2">
+                    <ApexChart TItem="DailyOverviewRow" Options="_baseOpts" Height="180">
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Resp"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => (decimal?)r.AvgBreath" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Per-night table ── *@
+    <div class="card">
+        <div class="card-header fw-semibold">Per-night data</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th class="text-end">Sleep</th>
+                            <th class="text-end">Ready</th>
+                            <th class="text-end">HRV</th>
+                            <th class="text-end">Avg HR</th>
+                            <th class="text-end">Low HR</th>
+                            <th class="text-end">Resp</th>
+                            <th class="text-end">Deep</th>
+                            <th class="text-end">REM</th>
+                            <th class="text-end">Awake</th>
+                            <th class="text-end">Temp °C</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _rows.OrderByDescending(r => r.Day))
+                        {
+                            <tr>
+                                <td>@row.Day.ToString("dd MMM")</td>
+                                <td class="text-end">@Fmt(row.SleepScore)</td>
+                                <td class="text-end">@Fmt(row.ReadinessScore)</td>
+                                <td class="text-end">@Fmt(row.AvgHrv)</td>
+                                <td class="text-end">@FmtD(row.AvgHr)</td>
+                                <td class="text-end">@Fmt(row.LowestHr)</td>
+                                <td class="text-end">@FmtD(row.AvgBreath)</td>
+                                <td class="text-end">@Fmt(row.DeepMinutes)</td>
+                                <td class="text-end">@Fmt(row.RemMinutes)</td>
+                                <td class="text-end">@Fmt(row.AwakeMinutes)</td>
+                                <td class="text-end">@FmtTemp(row.TempDeviation)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private UserOverview? _overview;
+    private List<DailyOverviewRow> _rows = [];
+
+    private int? AvgScore     => Avg(_rows.Select(r => (double?)r.SleepScore));
+    private int? AvgReadiness => Avg(_rows.Select(r => (double?)r.ReadinessScore));
+    private int? AvgHrv       => Avg(_rows.Select(r => (double?)r.AvgHrv));
+    private double? AvgHr     => NullableAvg(_rows.Select(r => r.AvgHr));
+    private int? AvgLowestHr  => Avg(_rows.Select(r => (double?)r.LowestHr));
+    private double? AvgBreath => NullableAvg(_rows.Select(r => r.AvgBreath));
+    private int? AvgDeep      => Avg(_rows.Select(r => (double?)r.DeepMinutes));
+    private int? AvgRem       => Avg(_rows.Select(r => (double?)r.RemMinutes));
+    private int? AvgAwake     => Avg(_rows.Select(r => (double?)r.AwakeMinutes));
+
+    private ApexChartOptions<DailyOverviewRow> _scoreOpts = null!;
+    private ApexChartOptions<DailyOverviewRow> _baseOpts = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _overview = await Query.GetUserOverviewAsync(Name, 30);
+        _rows = _overview.Rows;
+        _scoreOpts = BuildOptions(0, 100);
+        _baseOpts  = BuildOptions(null, null);
+        _loading = false;
+    }
+
+    private static int? Avg(IEnumerable<double?> values)
+    {
+        var v = values.Where(x => x.HasValue).Select(x => x!.Value).ToList();
+        return v.Count == 0 ? null : (int)Math.Round(v.Average());
+    }
+
+    private static double? NullableAvg(IEnumerable<double?> values)
+    {
+        var v = values.Where(x => x.HasValue).Select(x => x!.Value).ToList();
+        return v.Count == 0 ? null : v.Average();
+    }
+
+    private static string Fmt(int? v)     => v.HasValue ? v.Value.ToString() : "—";
+    private static string FmtD(double? v) => v.HasValue ? v.Value.ToString("F1") : "—";
+    private static string FmtTemp(double? v) => v.HasValue ? (v.Value >= 0 ? "+" : "") + v.Value.ToString("F2") : "—";
+
+    private static ApexChartOptions<DailyOverviewRow> BuildOptions(int? yMin, int? yMax)
+    {
+        return new ApexChartOptions<DailyOverviewRow>
+        {
+            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = [2] },
+            Markers = new Markers { Size = [0] },
+            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+            Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" } },
+            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+            Yaxis = [new YAxis { Min = yMin, Max = yMax, Labels = new YAxisLabels { MinWidth = 30 } }],
+            Legend = new Legend { Show = true },
+        };
+    }
+}

@@ -1,0 +1,10 @@
+@* Reusable stat box: large value + small label *@
+<div class="col">
+    <div class="fs-2 fw-bold">@Value</div>
+    <div class="text-muted small">@Label</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+}

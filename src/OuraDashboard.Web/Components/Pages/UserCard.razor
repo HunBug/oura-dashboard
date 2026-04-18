@@ -3,30 +3,41 @@
 @* ApexCharts needs InteractiveServer, inherited from the parent page *@
 
 <div class="card h-100">
-    <div class="card-header fw-semibold fs-5">@Overview.UserName</div>
+    <div class="card-header fw-semibold fs-5 d-flex justify-content-between align-items-center">
+        <span>@Overview.UserName</span>
+        <a href="user/@Overview.UserName" class="btn btn-sm btn-outline-secondary">Detail →</a>
+    </div>
     <div class="card-body">
 
         @* ── Key stats row ── *@
         <div class="row text-center mb-3 g-2">
             <div class="col">
                 <div class="fs-3 fw-bold">@Fmt(AvgScore)</div>
-                <div class="text-muted small">Avg sleep score</div>
+                <div class="text-muted small">Sleep score</div>
+            </div>
+            <div class="col">
+                <div class="fs-3 fw-bold">@Fmt(AvgReadiness)</div>
+                <div class="text-muted small">Readiness</div>
             </div>
             <div class="col">
                 <div class="fs-3 fw-bold">@Fmt(AvgHrvMs)</div>
-                <div class="text-muted small">Avg HRV (ms)</div>
+                <div class="text-muted small">HRV (ms)</div>
             </div>
             <div class="col">
                 <div class="fs-3 fw-bold">@FmtD(AvgHrBpm)</div>
-                <div class="text-muted small">Avg nocturnal HR</div>
+                <div class="text-muted small">Nocturnal HR</div>
+            </div>
+            <div class="col">
+                <div class="fs-3 fw-bold">@FmtD(AvgBreath)</div>
+                <div class="text-muted small">Resp (brpm)</div>
             </div>
             <div class="col">
                 <div class="fs-3 fw-bold">@Fmt(AvgDeepMin)</div>
-                <div class="text-muted small">Avg deep (min)</div>
+                <div class="text-muted small">Deep (min)</div>
             </div>
             <div class="col">
                 <div class="fs-3 fw-bold">@Fmt(AvgRemMin)</div>
-                <div class="text-muted small">Avg REM (min)</div>
+                <div class="text-muted small">REM (min)</div>
             </div>
         </div>
 
@@ -65,11 +76,13 @@
     private List<DailyOverviewRow> _rows = [];
 
     // Aggregates (only days that have data)
-    private int? AvgScore   => Avg(_rows.Select(r => (double?)r.SleepScore));
-    private int? AvgHrvMs   => Avg(_rows.Select(r => (double?)r.AvgHrv));
-    private double? AvgHrBpm => _rows.Where(r => r.AvgHr.HasValue).Select(r => r.AvgHr).DefaultIfEmpty().Average();
-    private int? AvgDeepMin => Avg(_rows.Select(r => (double?)r.DeepMinutes));
-    private int? AvgRemMin  => Avg(_rows.Select(r => (double?)r.RemMinutes));
+    private int? AvgScore     => Avg(_rows.Select(r => (double?)r.SleepScore));
+    private int? AvgReadiness => Avg(_rows.Select(r => (double?)r.ReadinessScore));
+    private int? AvgHrvMs     => Avg(_rows.Select(r => (double?)r.AvgHrv));
+    private double? AvgHrBpm  => _rows.Where(r => r.AvgHr.HasValue).Select(r => r.AvgHr).DefaultIfEmpty().Average();
+    private double? AvgBreath => _rows.Where(r => r.AvgBreath.HasValue).Select(r => r.AvgBreath).DefaultIfEmpty().Average();
+    private int? AvgDeepMin   => Avg(_rows.Select(r => (double?)r.DeepMinutes));
+    private int? AvgRemMin    => Avg(_rows.Select(r => (double?)r.RemMinutes));
 
     private static int? Avg(IEnumerable<double?> values)
     {

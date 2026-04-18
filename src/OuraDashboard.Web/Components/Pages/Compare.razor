@@ -1,0 +1,135 @@
+@page "/compare"
+@rendermode InteractiveServer
+
+@inject DashboardQueryService Query
+
+<PageTitle>Compare — Boo vs Maa</PageTitle>
+
+<h2 class="mb-4">Compare — Boo vs Maa, last 30 days</h2>
+
+@if (_loading)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    @* ── Side-by-side sleep score chart ── *@
+    <div class="card mb-4">
+        <div class="card-header text-muted small">Sleep score</div>
+        <div class="card-body p-2">
+            <ApexChart TItem="DailyOverviewRow" Options="_chartOpts" Height="220">
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_boo.Rows" Name="Boo"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => r.SleepScore" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maa.Rows" Name="Maa"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => r.SleepScore" />
+            </ApexChart>
+        </div>
+    </div>
+
+    @* ── HRV comparison chart ── *@
+    <div class="card mb-4">
+        <div class="card-header text-muted small">HRV (ms)</div>
+        <div class="card-body p-2">
+            <ApexChart TItem="DailyOverviewRow" Options="_chartOpts" Height="200">
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_boo.Rows" Name="Boo"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => r.AvgHrv" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maa.Rows" Name="Maa"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => r.AvgHrv" />
+            </ApexChart>
+        </div>
+    </div>
+
+    @* ── Per-night table ── *@
+    <div class="card">
+        <div class="card-header fw-semibold">Per-night comparison</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="align-middle">Date</th>
+                            <th colspan="4" class="text-center border-start">Boo</th>
+                            <th colspan="4" class="text-center border-start">Maa</th>
+                        </tr>
+                        <tr>
+                            <th class="text-end border-start">Sleep</th>
+                            <th class="text-end">HRV</th>
+                            <th class="text-end">HR</th>
+                            <th class="text-end">Resp</th>
+                            <th class="text-end border-start">Sleep</th>
+                            <th class="text-end">HRV</th>
+                            <th class="text-end">HR</th>
+                            <th class="text-end">Resp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var day in _days)
+                        {
+                            var b = _booByDay.GetValueOrDefault(day);
+                            var m = _maaByDay.GetValueOrDefault(day);
+                            <tr>
+                                <td>@day.ToString("dd MMM")</td>
+                                <td class="text-end border-start">@Fmt(b?.SleepScore)</td>
+                                <td class="text-end">@Fmt(b?.AvgHrv)</td>
+                                <td class="text-end">@FmtD(b?.AvgHr)</td>
+                                <td class="text-end">@FmtD(b?.AvgBreath)</td>
+                                <td class="text-end border-start">@Fmt(m?.SleepScore)</td>
+                                <td class="text-end">@Fmt(m?.AvgHrv)</td>
+                                <td class="text-end">@FmtD(m?.AvgHr)</td>
+                                <td class="text-end">@FmtD(m?.AvgBreath)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private UserOverview _boo = new("Boo", []);
+    private UserOverview _maa = new("Maa", []);
+
+    private List<DateOnly> _days = [];
+    private Dictionary<DateOnly, DailyOverviewRow> _booByDay = [];
+    private Dictionary<DateOnly, DailyOverviewRow> _maaByDay = [];
+
+    private ApexChartOptions<DailyOverviewRow> _chartOpts = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _boo = await Query.GetUserOverviewAsync("Boo", 30);
+        _maa = await Query.GetUserOverviewAsync("Maa", 30);
+
+        // Build union of all days, descending
+        _booByDay = _boo.Rows.ToDictionary(r => r.Day);
+        _maaByDay = _maa.Rows.ToDictionary(r => r.Day);
+        _days = _booByDay.Keys.Union(_maaByDay.Keys).OrderByDescending(d => d).ToList();
+
+        _chartOpts = new ApexChartOptions<DailyOverviewRow>
+        {
+            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = [2] },
+            Markers = new Markers { Size = [0] },
+            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+            Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" } },
+            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+            Yaxis = [new YAxis { Min = 0, Max = 100, Labels = new YAxisLabels { MinWidth = 30 } }],
+            Legend = new Legend { Show = true },
+        };
+
+        _loading = false;
+    }
+
+    private static string Fmt(int? v)     => v.HasValue ? v.Value.ToString() : "—";
+    private static string FmtD(double? v) => v.HasValue ? v.Value.ToString("F1") : "—";
+}
