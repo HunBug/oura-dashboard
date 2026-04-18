@@ -57,7 +57,7 @@ else
             <div class="card">
                 <div class="card-header text-muted small">HRV (ms)</div>
                 <div class="card-body p-2">
-                    <ApexChart TItem="DailyOverviewRow" Options="_baseOpts" Height="180">
+                    <ApexChart TItem="DailyOverviewRow" Options="_hrvOpts" Height="180">
                         <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="HRV"
                             SeriesType="SeriesType.Line"
                             XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
@@ -70,7 +70,7 @@ else
             <div class="card">
                 <div class="card-header text-muted small">Nocturnal HR &amp; Lowest HR</div>
                 <div class="card-body p-2">
-                    <ApexChart TItem="DailyOverviewRow" Options="_baseOpts" Height="180">
+                    <ApexChart TItem="DailyOverviewRow" Options="_hrOpts" Height="180">
                         <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Avg HR"
                             SeriesType="SeriesType.Line"
                             XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
@@ -87,7 +87,7 @@ else
             <div class="card">
                 <div class="card-header text-muted small">Respiratory rate (brpm)</div>
                 <div class="card-body p-2">
-                    <ApexChart TItem="DailyOverviewRow" Options="_baseOpts" Height="180">
+                    <ApexChart TItem="DailyOverviewRow" Options="_breathOpts" Height="180">
                         <ApexPointSeries TItem="DailyOverviewRow" Items="_rows" Name="Resp"
                             SeriesType="SeriesType.Line"
                             XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
@@ -117,6 +117,7 @@ else
                             <th class="text-end">REM</th>
                             <th class="text-end">Awake</th>
                             <th class="text-end">Temp °C</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -134,6 +135,7 @@ else
                                 <td class="text-end">@Fmt(row.RemMinutes)</td>
                                 <td class="text-end">@Fmt(row.AwakeMinutes)</td>
                                 <td class="text-end">@FmtTemp(row.TempDeviation)</td>
+                                <td><a href="/night/@Name/@row.Day.ToString("yyyy-MM-dd")" class="btn btn-sm btn-outline-secondary py-0 px-1">→</a></td>
                             </tr>
                         }
                     </tbody>
@@ -161,15 +163,19 @@ else
     private int? AvgAwake     => Avg(_rows.Select(r => (double?)r.AwakeMinutes));
 
     private ApexChartOptions<DailyOverviewRow> _scoreOpts = null!;
-    private ApexChartOptions<DailyOverviewRow> _baseOpts = null!;
+    private ApexChartOptions<DailyOverviewRow> _hrvOpts  = null!;
+    private ApexChartOptions<DailyOverviewRow> _hrOpts   = null!;
+    private ApexChartOptions<DailyOverviewRow> _breathOpts = null!;
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
         _overview = await Query.GetUserOverviewAsync(Name, 30);
         _rows = _overview.Rows;
-        _scoreOpts = BuildOptions(0, 100);
-        _baseOpts  = BuildOptions(null, null);
+        _scoreOpts  = BuildOptions(0, 100);
+        _hrvOpts    = BuildOptions(null, null);
+        _hrOpts     = BuildOptions(null, null);
+        _breathOpts = BuildOptions(null, null);
         _loading = false;
     }
 

@@ -1,0 +1,200 @@
+@page "/night/{UserName}/{DayStr}"
+@rendermode InteractiveServer
+
+@inject DashboardQueryService Query
+@inject IJSRuntime JS
+
+<PageTitle>@UserName — @DayStr</PageTitle>
+
+@if (_loading)
+{
+    <p><em>Loading…</em></p>
+}
+else if (_detail is null)
+{
+    <h2>@UserName — @DayStr</h2>
+    <p class="text-muted">No data found for this night.</p>
+}
+else
+{
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+        <a href="/user/@UserName" class="btn btn-sm btn-outline-secondary">← @UserName overview</a>
+
+        @* prev / next night navigation *@
+        @if (_prevDay.HasValue)
+        {
+            <a href="/night/@UserName/@_prevDay.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-outline-secondary">‹ Prev night</a>
+        }
+        else
+        {
+            <span class="btn btn-sm btn-outline-secondary disabled">‹ Prev night</span>
+        }
+
+        <h2 class="mb-0 flex-grow-1 text-center">@UserName — @_detail.Day.ToString("dddd, dd MMM yyyy")</h2>
+
+        @if (_nextDay.HasValue)
+        {
+            <a href="/night/@UserName/@_nextDay.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-outline-secondary">Next night ›</a>
+        }
+        else
+        {
+            <span class="btn btn-sm btn-outline-secondary disabled">Next night ›</span>
+        }
+    </div>
+
+    @* ── Stats row ── *@
+    <div class="row text-center mb-4 g-2">
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.SleepScore)</div><div class="text-muted small">Sleep score</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.ReadinessScore)</div><div class="text-muted small">Readiness</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AverageHrv)</div><div class="text-muted small">HRV avg (ms)</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageHeartRate)</div><div class="text-muted small">Avg HR (bpm)</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.LowestHeartRate)</div><div class="text-muted small">Lowest HR</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageBreath)</div><div class="text-muted small">Resp (brpm)</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.DeepMinutes)</div><div class="text-muted small">Deep (min)</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.RemMinutes)</div><div class="text-muted small">REM (min)</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AwakeMinutes)</div><div class="text-muted small">Awake (min)</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@FmtTemp(_detail.TempDeviation)</div><div class="text-muted small">Temp dev</div></div>
+    </div>
+
+    @* ── Intra-night HRV chart ── *@
+    @if (_detail.HrvSeries.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header text-muted small">Intra-night HRV (5-min samples, ms)</div>
+            <div class="card-body p-2">
+                <ApexChart TItem="SamplePoint" Options="_seriesOpts" Height="200">
+                    <ApexPointSeries TItem="SamplePoint" Items="_detail.HrvSeries" Name="HRV (ms)"
+                        SeriesType="SeriesType.Line"
+                        XValue="p => p.Time.LocalDateTime"
+                        YValue="p => (decimal?)p.Value" />
+                </ApexChart>
+            </div>
+        </div>
+    }
+
+    @* ── Intra-night HR chart ── *@
+    @if (_detail.HeartRateSeries.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header text-muted small">Intra-night heart rate (5-min samples, bpm)</div>
+            <div class="card-body p-2">
+                <ApexChart TItem="SamplePoint" Options="_seriesOpts" Height="200">
+                    <ApexPointSeries TItem="SamplePoint" Items="_detail.HeartRateSeries" Name="HR (bpm)"
+                        SeriesType="SeriesType.Line"
+                        XValue="p => p.Time.LocalDateTime"
+                        YValue="p => (decimal?)p.Value" />
+                </ApexChart>
+            </div>
+        </div>
+    }
+
+    @* ── LLM text export ── *@
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Raw data — copy to LLM</span>
+            <button class="btn btn-sm btn-outline-primary" @onclick="CopyToClipboard">Copy</button>
+        </div>
+        <div class="card-body p-2">
+            <textarea @ref="_textareaRef" class="form-control font-monospace" style="font-size:0.78rem" rows="18" readonly>@_llmText</textarea>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string UserName { get; set; } = string.Empty;
+    [Parameter] public string DayStr  { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private NightData? _detail;
+    private DateOnly? _prevDay;
+    private DateOnly? _nextDay;
+    private string _llmText = string.Empty;
+    private ApexChartOptions<SamplePoint> _seriesOpts = null!;
+    private ElementReference _textareaRef;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        if (!DateOnly.TryParse(DayStr, out var day))
+        {
+            _loading = false;
+            return;
+        }
+
+        _detail = await Query.GetNightDetailAsync(UserName, day);
+
+        // Build prev/next navigation from available nights
+        var nights = await Query.GetNightDaysAsync(UserName, 90);
+        var idx = nights.IndexOf(day);
+        _nextDay = idx > 0             ? nights[idx - 1] : (DateOnly?)null; // list is DESC
+        _prevDay = idx < nights.Count - 1 ? nights[idx + 1] : (DateOnly?)null;
+
+        _seriesOpts = new ApexChartOptions<SamplePoint>
+        {
+            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = [1] },
+            Markers = new Markers { Size = [0] },
+            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+            Tooltip = new Tooltip { X = new TooltipX { Format = "HH:mm" } },
+            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "HH:mm" } },
+            Yaxis = [new YAxis { Labels = new YAxisLabels { MinWidth = 30 } }],
+            Legend = new Legend { Show = false },
+        };
+
+        if (_detail is not null)
+            _llmText = BuildLlmText(_detail);
+
+        _loading = false;
+    }
+
+    private async Task CopyToClipboard()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _llmText);
+    }
+
+    private static string BuildLlmText(NightData d)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"=== Oura Night Data: {d.UserName}, {d.Day:yyyy-MM-dd} ({d.Day:dddd}) ===");
+        sb.AppendLine();
+        sb.AppendLine("SCORES");
+        sb.AppendLine($"  Sleep score  : {d.SleepScore?.ToString() ?? "N/A"}");
+        sb.AppendLine($"  Readiness    : {d.ReadinessScore?.ToString() ?? "N/A"}");
+        sb.AppendLine($"  Temp dev     : {(d.TempDeviation.HasValue ? (d.TempDeviation >= 0 ? "+" : "") + d.TempDeviation.Value.ToString("F2") + " °C" : "N/A")}");
+        sb.AppendLine();
+        sb.AppendLine("HEART RATE & HRV");
+        sb.AppendLine($"  Avg HRV      : {(d.AverageHrv.HasValue ? d.AverageHrv + " ms" : "N/A")}");
+        sb.AppendLine($"  Avg HR       : {(d.AverageHeartRate.HasValue ? d.AverageHeartRate.Value.ToString("F1") + " bpm" : "N/A")}");
+        sb.AppendLine($"  Lowest HR    : {(d.LowestHeartRate.HasValue ? d.LowestHeartRate + " bpm" : "N/A")}");
+        sb.AppendLine($"  Resp rate    : {(d.AverageBreath.HasValue ? d.AverageBreath.Value.ToString("F1") + " brpm" : "N/A")}");
+        sb.AppendLine();
+        sb.AppendLine("SLEEP STAGES");
+        sb.AppendLine($"  Deep sleep   : {(d.DeepMinutes.HasValue ? d.DeepMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  REM sleep    : {(d.RemMinutes.HasValue ? d.RemMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  Awake        : {(d.AwakeMinutes.HasValue ? d.AwakeMinutes + " min" : "N/A")}");
+
+        if (d.HrvSeries.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("INTRA-NIGHT HRV (5-min intervals, ms — null = no signal)");
+            sb.Append("  ");
+            sb.AppendLine(string.Join(", ", d.HrvSeries.Select(p =>
+                $"{p.Time.ToLocalTime():HH:mm}={p.Value?.ToString("F0") ?? "null"}")));
+        }
+
+        if (d.HeartRateSeries.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("INTRA-NIGHT HEART RATE (5-min intervals, bpm — null = no signal)");
+            sb.Append("  ");
+            sb.AppendLine(string.Join(", ", d.HeartRateSeries.Select(p =>
+                $"{p.Time.ToLocalTime():HH:mm}={p.Value?.ToString("F0") ?? "null"}")));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string Fmt(int? v)       => v.HasValue ? v.Value.ToString() : "—";
+    private static string FmtD(double? v)   => v.HasValue ? v.Value.ToString("F1") : "—";
+    private static string FmtTemp(double? v) => v.HasValue ? (v.Value >= 0 ? "+" : "") + v.Value.ToString("F2") + " °C" : "—";
+}

@@ -34,7 +34,7 @@ else
     <div class="card mb-4">
         <div class="card-header text-muted small">HRV (ms)</div>
         <div class="card-body p-2">
-            <ApexChart TItem="DailyOverviewRow" Options="_chartOpts" Height="200">
+            <ApexChart TItem="DailyOverviewRow" Options="_hrvOpts" Height="200">
                 <ApexPointSeries TItem="DailyOverviewRow" Items="_boo.Rows" Name="Boo"
                     SeriesType="SeriesType.Line"
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
@@ -104,6 +104,7 @@ else
     private Dictionary<DateOnly, DailyOverviewRow> _maaByDay = [];
 
     private ApexChartOptions<DailyOverviewRow> _chartOpts = null!;
+    private ApexChartOptions<DailyOverviewRow> _hrvOpts = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -124,6 +125,18 @@ else
             Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" } },
             Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
             Yaxis = [new YAxis { Min = 0, Max = 100, Labels = new YAxisLabels { MinWidth = 30 } }],
+            Legend = new Legend { Show = true },
+        };
+
+        _hrvOpts = new ApexChartOptions<DailyOverviewRow>
+        {
+            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = [2] },
+            Markers = new Markers { Size = [0] },
+            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+            Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" } },
+            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+            Yaxis = [new YAxis { Labels = new YAxisLabels { MinWidth = 30 } }],
             Legend = new Legend { Show = true },
         };
 
