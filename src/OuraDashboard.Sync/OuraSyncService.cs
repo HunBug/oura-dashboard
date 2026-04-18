@@ -20,6 +20,9 @@ public record SyncResult(
     int DailyHrvCount,
     int DailyActivityCount,
     int Vo2MaxCount,
+    int Spo2Count,
+    int ResilienceCount,
+    int WorkoutCount,
     List<string> Errors);
 
 /// <summary>
@@ -44,7 +47,7 @@ public class OuraSyncService(
         if (userConfig is null)
         {
             errors.Add($"No config found for user '{userName}'");
-            return new SyncResult(userName, start, end, 0, 0, 0, 0, 0, 0, 0, 0, errors);
+            return new SyncResult(userName, start, end, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, errors);
         }
 
         // Create a scoped HttpClient with this user's Bearer token
@@ -60,25 +63,30 @@ public class OuraSyncService(
 
         var counts = (
             DailySleep: 0, SleepSession: 0, Readiness: 0, HeartRate: 0,
-            Stress: 0, Hrv: 0, Activity: 0, Vo2Max: 0);
+            Stress: 0, Hrv: 0, Activity: 0, Vo2Max: 0,
+            Spo2: 0, Resilience: 0, Workout: 0);
 
         counts.DailySleep  = await SyncDailySleepAsync(user, api, start, end, errors, ct);
         counts.SleepSession = await SyncSleepSessionsAsync(user, api, start, end, errors, ct);
         counts.Readiness   = await SyncReadinessAsync(user, api, start, end, errors, ct);
         counts.HeartRate   = await SyncHeartRateAsync(user, api, start, end, errors, ct);
         counts.Stress      = await SyncDailyEndpointAsync(user, api, start, end, "daily_stress", errors, ct);
-        counts.Hrv         = await SyncDailyEndpointAsync(user, api, start, end, "daily_hrv", errors, ct);
+        // daily_hrv does not exist as a standalone Oura endpoint; HRV is captured via sleep sessions (average_hrv)
         counts.Activity    = await SyncDailyEndpointAsync(user, api, start, end, "daily_activity", errors, ct);
-        counts.Vo2Max      = await SyncDailyEndpointAsync(user, api, start, end, "vo2_max", errors, ct);
+        counts.Vo2Max      = await SyncDailyEndpointAsync(user, api, start, end, "vO2_max", errors, ct);
+        counts.Spo2        = await SyncDailyEndpointAsync(user, api, start, end, "daily_spo2", errors, ct);
+        counts.Resilience  = await SyncDailyEndpointAsync(user, api, start, end, "daily_resilience", errors, ct);
+        counts.Workout     = await SyncDailyEndpointAsync(user, api, start, end, "workout", errors, ct);
 
         logger.LogInformation(
-            "Sync complete for {User}: sleep={S} sessions={Ss} readiness={R} hr={Hr} stress={St} hrv={Hv} activity={A} vo2={V} errors={E}",
+            "Sync complete for {User}: sleep={S} sessions={Ss} readiness={R} hr={Hr} stress={St} activity={A} vo2={V} spo2={Sp} resilience={Rs} workout={Wo} errors={E}",
             userName, counts.DailySleep, counts.SleepSession, counts.Readiness, counts.HeartRate,
-            counts.Stress, counts.Hrv, counts.Activity, counts.Vo2Max, errors.Count);
+            counts.Stress, counts.Activity, counts.Vo2Max, counts.Spo2, counts.Resilience, counts.Workout, errors.Count);
 
         return new SyncResult(userName, start, end,
             counts.DailySleep, counts.SleepSession, counts.Readiness, counts.HeartRate,
-            counts.Stress, counts.Hrv, counts.Activity, counts.Vo2Max, errors);
+            counts.Stress, counts.Hrv, counts.Activity, counts.Vo2Max,
+            counts.Spo2, counts.Resilience, counts.Workout, errors);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -98,7 +106,8 @@ public class OuraSyncService(
     private async Task<int> SyncDailySleepAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var (doc, notFound) = await api.FetchDailyAsync("daily_sleep", start, end, ct);
+        var latestDay = await db.DailySleeps.Where(x => x.UserId == user.Id).MaxAsync(x => (DateOnly?)x.Day, ct);
+        var (doc, notFound) = await api.FetchDailyAsync("daily_sleep", EffectiveStart(latestDay, start), end, ct);
         if (doc is null) { if (!notFound) errors.Add("daily_sleep: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
@@ -155,7 +164,8 @@ public class OuraSyncService(
     private async Task<int> SyncSleepSessionsAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var (doc, notFound) = await api.FetchDailyAsync("sleep", start, end, ct);
+        var latestDay = await db.SleepSessions.Where(x => x.UserId == user.Id).MaxAsync(x => (DateOnly?)x.Day, ct);
+        var (doc, notFound) = await api.FetchDailyAsync("sleep", EffectiveStart(latestDay, start), end, ct);
         if (doc is null) { if (!notFound) errors.Add("sleep: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
@@ -228,7 +238,8 @@ public class OuraSyncService(
     private async Task<int> SyncReadinessAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
-        var (doc, notFound) = await api.FetchDailyAsync("daily_readiness", start, end, ct);
+        var latestDay = await db.DailyReadinesses.Where(x => x.UserId == user.Id).MaxAsync(x => (DateOnly?)x.Day, ct);
+        var (doc, notFound) = await api.FetchDailyAsync("daily_readiness", EffectiveStart(latestDay, start), end, ct);
         if (doc is null) { if (!notFound) errors.Add("daily_readiness: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
@@ -285,11 +296,16 @@ public class OuraSyncService(
     private async Task<int> SyncHeartRateAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end, List<string> errors, CancellationToken ct)
     {
+        // Extend start back to fill any gap since the last stored sample
+        var latestTimestamp = await db.HeartRateSamples.Where(x => x.UserId == user.Id).MaxAsync(x => (DateTimeOffset?)x.Timestamp, ct);
+        var latestHrDay = latestTimestamp.HasValue ? DateOnly.FromDateTime(latestTimestamp.Value.UtcDateTime) : (DateOnly?)null;
+        var effectiveStart = EffectiveStart(latestHrDay, start);
+
         // Oura heartrate endpoint has a ~30-day window limit; chunk accordingly.
         const int ChunkDays = 30;
         var allItems = new List<JsonElement>();
 
-        var chunkStart = start;
+        var chunkStart = effectiveStart;
         while (chunkStart <= end)
         {
             var chunkEnd = chunkStart.AddDays(ChunkDays - 1);
@@ -311,7 +327,7 @@ public class OuraSyncService(
         if (allItems.Count == 0) return 0;
 
         // Bulk upsert: fetch existing timestamps for full range, then insert only new ones.
-        var startDto = new DateTimeOffset(start.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        var startDto = new DateTimeOffset(effectiveStart.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var endDto   = new DateTimeOffset(end.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
 
         var existingTimestamps = await db.HeartRateSamples
@@ -366,14 +382,15 @@ public class OuraSyncService(
 
     /// <summary>
     /// Generic handler for endpoints whose raw JSON we store but don't heavily extract from yet
-    /// (daily_stress, daily_hrv, daily_activity, vo2_max).
+    /// (daily_stress, daily_activity, vO2_max).
     /// Stores the full raw payload; scalar extraction can be added per-entity later.
     /// </summary>
     private async Task<int> SyncDailyEndpointAsync(
         OuraUser user, OuraApiClient api, DateOnly start, DateOnly end,
         string endpoint, List<string> errors, CancellationToken ct)
     {
-        var (doc, notFound) = await api.FetchDailyAsync(endpoint, start, end, ct);
+        var latestDay = await GetLatestDayForEndpointAsync(user.Id, endpoint, ct);
+        var (doc, notFound) = await api.FetchDailyAsync(endpoint, EffectiveStart(latestDay, start), end, ct);
         if (doc is null) { if (!notFound) errors.Add($"{endpoint}: fetch failed"); return 0; }
 
         var items = doc.RootElement.TryGetProperty("data", out var data)
@@ -391,10 +408,12 @@ public class OuraSyncService(
 
                 count += endpoint switch
                 {
-                    "daily_stress"   => await UpsertDailyStressAsync(user, day, ouraId, item, rawText, ct),
-                    "daily_hrv"      => await UpsertDailyHrvAsync(user, day, ouraId, item, rawText, ct),
-                    "daily_activity" => await UpsertDailyActivityAsync(user, day, ouraId, item, rawText, ct),
-                    "vo2_max"        => await UpsertVo2MaxAsync(user, day, ouraId, item, rawText, ct),
+                    "daily_stress"     => await UpsertDailyStressAsync(user, day, ouraId, item, rawText, ct),
+                    "daily_activity"   => await UpsertDailyActivityAsync(user, day, ouraId, item, rawText, ct),
+                    "vO2_max"          => await UpsertVo2MaxAsync(user, day, ouraId, item, rawText, ct),
+                    "daily_spo2"       => await UpsertDailySpo2Async(user, day, ouraId, item, rawText, ct),
+                    "daily_resilience" => await UpsertDailyResilienceAsync(user, day, ouraId, item, rawText, ct),
+                    "workout"          => await UpsertWorkoutAsync(user, day, ouraId, item, rawText, ct),
                     _ => 0
                 };
             }
@@ -475,6 +494,92 @@ public class OuraSyncService(
         if (existing is null) db.Vo2Maxes.Add(entity);
         return 1;
     }
+
+    private async Task<int> UpsertDailySpo2Async(
+        OuraUser user, DateOnly day, string ouraId, JsonElement item, string rawText, CancellationToken ct)
+    {
+        var existing = await db.DailySpo2s.FirstOrDefaultAsync(x => x.UserId == user.Id && x.Day == day, ct);
+        var entity = existing ?? new DailySpo2 { UserId = user.Id };
+        entity.OuraId = ouraId;
+        entity.Day = day;
+        entity.BreathingDisturbanceIndex = GetNullableInt(item, "breathing_disturbance_index");
+        if (item.TryGetProperty("spo2_percentage", out var spo2) && spo2.ValueKind != JsonValueKind.Null)
+            entity.Spo2Average = GetNullableDouble(spo2, "average");
+        existing?.RawJson.Dispose();
+        entity.RawJson = JsonDocument.Parse(rawText);
+        if (existing is null) db.DailySpo2s.Add(entity);
+        return 1;
+    }
+
+    private async Task<int> UpsertDailyResilienceAsync(
+        OuraUser user, DateOnly day, string ouraId, JsonElement item, string rawText, CancellationToken ct)
+    {
+        var existing = await db.DailyResilienceRecords.FirstOrDefaultAsync(x => x.UserId == user.Id && x.Day == day, ct);
+        var entity = existing ?? new DailyResilience { UserId = user.Id };
+        entity.OuraId = ouraId;
+        entity.Day = day;
+        entity.Level = item.TryGetProperty("level", out var lvl) && lvl.ValueKind != JsonValueKind.Null
+            ? lvl.GetString() : null;
+        if (item.TryGetProperty("contributors", out var contrib) && contrib.ValueKind != JsonValueKind.Null)
+        {
+            entity.SleepRecovery   = GetNullableDouble(contrib, "sleep_recovery");
+            entity.DaytimeRecovery = GetNullableDouble(contrib, "daytime_recovery");
+            entity.Stress          = GetNullableDouble(contrib, "stress");
+        }
+        existing?.RawJson.Dispose();
+        entity.RawJson = JsonDocument.Parse(rawText);
+        if (existing is null) db.DailyResilienceRecords.Add(entity);
+        return 1;
+    }
+
+    private async Task<int> UpsertWorkoutAsync(
+        OuraUser user, DateOnly day, string ouraId, JsonElement item, string rawText, CancellationToken ct)
+    {
+        var existing = await db.Workouts.FirstOrDefaultAsync(x => x.UserId == user.Id && x.OuraId == ouraId, ct);
+        var entity = existing ?? new Workout { UserId = user.Id };
+        entity.OuraId = ouraId;
+        entity.Day = day;
+        entity.Activity  = item.TryGetProperty("activity", out var act) && act.ValueKind != JsonValueKind.Null ? act.GetString() : null;
+        entity.Calories  = GetNullableDouble(item, "calories");
+        entity.Distance  = GetNullableDouble(item, "distance");
+        entity.Intensity = item.TryGetProperty("intensity", out var inten) && inten.ValueKind != JsonValueKind.Null ? inten.GetString() : null;
+        entity.Source    = item.TryGetProperty("source", out var src) && src.ValueKind != JsonValueKind.Null ? src.GetString() : null;
+        if (item.TryGetProperty("start_datetime", out var sdt) && sdt.ValueKind != JsonValueKind.Null)
+            entity.StartDatetime = DateTimeOffset.Parse(sdt.GetString()!).ToUniversalTime();
+        if (item.TryGetProperty("end_datetime", out var edt) && edt.ValueKind != JsonValueKind.Null)
+            entity.EndDatetime = DateTimeOffset.Parse(edt.GetString()!).ToUniversalTime();
+        existing?.RawJson.Dispose();
+        entity.RawJson = JsonDocument.Parse(rawText);
+        if (existing is null) db.Workouts.Add(entity);
+        return 1;
+    }
+
+    // ── Incremental fetch helpers ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the effective start date for an API fetch: if the DB has a gap beyond the
+    /// rolling window, fills from the day after the last stored record; otherwise uses the
+    /// rolling window start (so recent days are re-checked for Oura data revisions).
+    /// </summary>
+    private static DateOnly EffectiveStart(DateOnly? latestDay, DateOnly requestedStart)
+    {
+        if (latestDay is null) return requestedStart;
+        return latestDay.Value >= requestedStart
+            ? requestedStart         // data is recent — use rolling window to catch revisions
+            : latestDay.Value.AddDays(1); // gap detected — fill from where we left off
+    }
+
+    private async Task<DateOnly?> GetLatestDayForEndpointAsync(int userId, string endpoint, CancellationToken ct)
+        => endpoint switch
+        {
+            "daily_stress"     => await db.DailyStresses.Where(x => x.UserId == userId).MaxAsync(x => (DateOnly?)x.Day, ct),
+            "daily_activity"   => await db.DailyActivities.Where(x => x.UserId == userId).MaxAsync(x => (DateOnly?)x.Day, ct),
+            "vO2_max"          => await db.Vo2Maxes.Where(x => x.UserId == userId).MaxAsync(x => (DateOnly?)x.Day, ct),
+            "daily_spo2"       => await db.DailySpo2s.Where(x => x.UserId == userId).MaxAsync(x => (DateOnly?)x.Day, ct),
+            "daily_resilience" => await db.DailyResilienceRecords.Where(x => x.UserId == userId).MaxAsync(x => (DateOnly?)x.Day, ct),
+            "workout"          => await db.Workouts.Where(x => x.UserId == userId).MaxAsync(x => (DateOnly?)x.Day, ct),
+            _ => null
+        };
 
     // ── JSON helpers ──────────────────────────────────────────────────────────
 

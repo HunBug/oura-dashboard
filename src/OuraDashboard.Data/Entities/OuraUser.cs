@@ -14,4 +14,7 @@ public class OuraUser
     public List<DailyHrv> DailyHrvs { get; set; } = [];
     public List<DailyActivity> DailyActivities { get; set; } = [];
     public List<Vo2Max> Vo2Maxes { get; set; } = [];
+    public List<DailySpo2> DailySpo2s { get; set; } = [];
+    public List<DailyResilience> DailyResilienceRecords { get; set; } = [];
+    public List<Workout> Workouts { get; set; } = [];
 }

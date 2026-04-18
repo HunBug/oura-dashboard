@@ -138,29 +138,55 @@ Thin console app — just parses args and calls `OuraSyncService`.
 
 ## Web app (`OuraDashboard.Web`)
 
-Blazor Server (.NET 10). Read-only against the DB — no Oura API calls here.
+Blazor Server (.NET 10). Uses `@rendermode InteractiveServer` throughout.
+Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS interop).
 
-### Pages
+### Pages — built ✅
+
+| Route | Component | Status |
+|---|---|---|
+| `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
+| `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with all columns |
+| `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
+| `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
+
+### Pages — planned 🔲
 
 | Route | Purpose |
 |---|---|
-| `/` | Side-by-side overview: both users, last 30 days, key trend sparklines |
-| `/user/{name}` | Per-user deep-dive: HR distribution, HRV trend, custom recovery score, cycle overlays (Maa) |
-| `/compare` | Shared nights: sync/divergence analysis |
 | `/raw` | Raw JSON export — select user, date range, endpoint; copy-paste to LLM |
-| `/sync` | Sync status: last run, per-user results, "Refresh" trigger button |
 
-### Custom metrics (computed at query time, not stored)
+### Services
 
-- **Real Recovery Score (0–100):** `% night HR < 75` (weighted) + `HRV avg > 15 ms` (binary) + `restorative sleep > 150 min` + `resp rate` (inverted). Replaces Oura's sleep score for Maa.
-- **Autonomic State Trend:** 7-day rolling average of nocturnal HR, HRV avg, resp rate — plotted as a trend line.
-- **HR Settling Time:** how many minutes after bedtime until HR drops below 75 bpm.
+**`DashboardQueryService`** (Scoped) — all DB reads for the dashboard.
+- `GetUserOverviewAsync(userName, days)` → `UserOverview` with one `DailyOverviewRow` per calendar day.
+- Joins: `DailySleep` (score), `DailyReadinesses` (readiness score, temperature deviation), `SleepSessions` (HRV, HR, lowest HR, respiratory rate, deep/REM/awake minutes).
+- Session preference: `long_sleep` type first, then highest (deep + REM) for the day.
+- Days with no data return a row with all-null metrics (so charts show gaps rather than missing points).
+
+**`DailyOverviewRow`** record fields:
+`Day`, `SleepScore`, `ReadinessScore`, `AvgHrv`, `AvgHr`, `LowestHr`, `AvgBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `TempDeviation`
+
+### Shared components
+
+| Component | Location | Purpose |
+|---|---|---|
+| `UserCard` | `Components/Pages/` | Home page card per user |
+| `StatBox` | `Components/Shared/` | Reusable large-value + small-label tile |
+
+### Known Oura API notes (from live data)
+
+- `GET /v2/usercollection/daily_hrv` returns **404** for both users — endpoint not available on their subscription plan.
+- `GET /v2/usercollection/vo2_max` returns **404** — same reason.
+- `TemperatureDeviation` in `DailyReadiness` **is** populated from the readiness endpoint.
+
+### Custom metrics — planned 🔲
+
+- **Real Recovery Score (0–100):** `% night HR < 75` (weighted) + `HRV avg > 15 ms` (binary) + `restorative sleep > 150 min` + `resp rate` (inverted). Requires `HeartRateSample` queries.
+- **Autonomic State Trend:** 7-day rolling average of nocturnal HR, HRV avg, resp rate.
+- **HR Settling Time:** minutes after bedtime until HR drops below 75 bpm.
 - **HRV Night Direction:** early-half vs late-half HRV average.
-- **% Night above HR threshold:** configurable threshold (default 75, 80 bpm).
-
-### Charts
-
-Blazor components wrapping **Chart.js** via JS interop (lightweight, no full JS framework).
+- **% Night above HR threshold:** configurable threshold (default 75 bpm).
 
 ---
 
@@ -229,15 +255,17 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 
 ## Build order (implementation steps)
 
-1. **Solution scaffold** — `dotnet new sln`, four projects, project references, `appsettings.example.json`, `docker-compose.yml`
-2. **Data layer** — entities, DbContext, Npgsql/EF provider, initial migration
-3. **Sync library** — Oura HTTP client, `OuraSyncService`, upsert logic
-4. **Sync CLI** — thin console app wrapping the library
-5. **Web: `SyncBackgroundService`** — timer + Channel trigger, `ISyncTrigger`, `/sync` status page
-6. **Web: layout + raw export page** — simplest useful thing first
-7. **Web: overview dashboard** — sparklines, side-by-side table
-8. **Web: per-user deep-dive** — charts, custom metrics, cycle overlay
-9. **Deployment** — systemd unit file, full Docker Compose variant
+1. ✅ **Solution scaffold** — `dotnet new sln`, four projects, project references, `appsettings.example.json`, `docker-compose.yml`
+2. ✅ **Data layer** — entities, DbContext, Npgsql/EF provider, initial migration
+3. ✅ **Sync library** — Oura HTTP client, `OuraSyncService`, upsert logic
+4. ✅ **Sync CLI** — thin console app wrapping the library (`--days N`)
+5. ✅ **Web: `SyncBackgroundService`** — timer + Channel trigger, `ISyncTrigger`, `/sync` status page
+6. ✅ **Web: overview dashboard** — `Home.razor`, `UserCard.razor`, `DashboardQueryService`, Blazor-ApexCharts sparklines
+7. ✅ **Web: per-user detail page** — `UserDetail.razor`, 4 charts, per-night table, all scalar metrics
+8. ✅ **Web: compare page** — `Compare.razor`, overlaid charts, side-by-side per-night table
+9. 🔲 **Web: raw export page** — `/raw`, JSON download, copy-to-clipboard
+10. 🔲 **Custom metrics** — Real Recovery Score, HR Settling Time, HRV Night Direction (requires `HeartRateSample` queries)
+11. 🔲 **Deployment** — systemd unit file, full Docker Compose variant
 
 ---
 

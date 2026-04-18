@@ -69,8 +69,8 @@ foreach (var user in options.Users)
     Console.WriteLine(
         $"[{user.Name}] sleep={result.DailySleepCount} sessions={result.SleepSessionCount} " +
         $"readiness={result.ReadinessCount} hr={result.HeartRateSampleCount} " +
-        $"stress={result.DailyStressCount} hrv={result.DailyHrvCount} " +
-        $"activity={result.DailyActivityCount} vo2={result.Vo2MaxCount}");
+        $"stress={result.DailyStressCount} activity={result.DailyActivityCount} vo2={result.Vo2MaxCount} " +
+        $"spo2={result.Spo2Count} resilience={result.ResilienceCount} workout={result.WorkoutCount}");
 
     if (result.Errors.Count > 0)
     {

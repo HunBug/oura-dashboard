@@ -14,6 +14,9 @@ public class OuraDbContext(DbContextOptions<OuraDbContext> options) : DbContext(
     public DbSet<DailyHrv> DailyHrvs => Set<DailyHrv>();
     public DbSet<DailyActivity> DailyActivities => Set<DailyActivity>();
     public DbSet<Vo2Max> Vo2Maxes => Set<Vo2Max>();
+    public DbSet<DailySpo2> DailySpo2s => Set<DailySpo2>();
+    public DbSet<DailyResilience> DailyResilienceRecords => Set<DailyResilience>();
+    public DbSet<Workout> Workouts => Set<Workout>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -105,6 +108,41 @@ public class OuraDbContext(DbContextOptions<OuraDbContext> options) : DbContext(
             e.Property(x => x.OuraId).HasMaxLength(50).IsRequired();
             e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
             e.HasOne(x => x.User).WithMany(u => u.Vo2Maxes).HasForeignKey(x => x.UserId);
+        });
+
+        // DailySpo2 — unique per user+day
+        model.Entity<DailySpo2>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.UserId, x.Day }).IsUnique();
+            e.Property(x => x.OuraId).HasMaxLength(50).IsRequired();
+            e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
+            e.HasOne(x => x.User).WithMany(u => u.DailySpo2s).HasForeignKey(x => x.UserId);
+        });
+
+        // DailyResilience — unique per user+day
+        model.Entity<DailyResilience>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.UserId, x.Day }).IsUnique();
+            e.Property(x => x.OuraId).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Level).HasMaxLength(20);
+            e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
+            e.HasOne(x => x.User).WithMany(u => u.DailyResilienceRecords).HasForeignKey(x => x.UserId);
+        });
+
+        // Workout — unique per user+OuraId (multiple workouts per day possible)
+        model.Entity<Workout>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.UserId, x.OuraId }).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Day });
+            e.Property(x => x.OuraId).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Activity).HasMaxLength(100);
+            e.Property(x => x.Intensity).HasMaxLength(20);
+            e.Property(x => x.Source).HasMaxLength(50);
+            e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
+            e.HasOne(x => x.User).WithMany(u => u.Workouts).HasForeignKey(x => x.UserId);
         });
     }
 }
