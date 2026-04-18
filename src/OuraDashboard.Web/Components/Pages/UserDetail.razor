@@ -16,9 +16,14 @@ else if (_overview is null || _overview.Rows.Count == 0)
 }
 else
 {
-    <div class="d-flex align-items-center mb-4 gap-3">
+    <div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
         <a href="/" class="btn btn-sm btn-outline-secondary">← Overview</a>
-        <h2 class="mb-0">@Name — last 30 days</h2>
+        <h2 class="mb-0 flex-grow-1">@Name — last 30 days</h2>
+        @{ var lastNight = _overview.Rows.LastOrDefault(r => r.SleepScore.HasValue)?.Day; }
+        @if (lastNight.HasValue)
+        {
+            <a href="/night/@Name/@lastNight.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-primary">Last night →</a>
+        }
     </div>
 
     @* ── Aggregate stats ── *@

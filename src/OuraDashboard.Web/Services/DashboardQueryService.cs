@@ -27,16 +27,56 @@ public record SamplePoint(DateTimeOffset Time, double? Value);
 public record NightData(
     string UserName,
     DateOnly Day,
+    // Scores
     int? SleepScore,
     int? ReadinessScore,
     double? TempDeviation,
+    double? TempTrendDeviation,
+    // Session scalars
     int? AverageHrv,
     double? AverageHeartRate,
     int? LowestHeartRate,
     double? AverageBreath,
     int? DeepMinutes,
     int? RemMinutes,
+    int? LightSleepMinutes,
     int? AwakeMinutes,
+    int? TotalSleepMinutes,
+    int? TimeInBedMinutes,
+    int? Efficiency,
+    int? LatencyMinutes,
+    int? RestlessPeriods,
+    DateTimeOffset? BedtimeStart,
+    DateTimeOffset? BedtimeEnd,
+    string? SleepPhase5Min,
+    // Sleep score contributors (0–100)
+    int? SleepDeepContributor,
+    int? SleepEfficiencyContributor,
+    int? SleepLatencyContributor,
+    int? SleepRemContributor,
+    int? SleepRestfulnessContributor,
+    int? SleepTimingContributor,
+    int? SleepTotalContributor,
+    // Readiness contributors (0–100)
+    int? ReadinessActivityBalance,
+    int? ReadinessBodyTemp,
+    int? ReadinessHrvBalance,
+    int? ReadinessPrevDayActivity,
+    int? ReadinessPrevNight,
+    int? ReadinessRecoveryIndex,
+    int? ReadinessRhr,
+    int? ReadinessSleepBalance,
+    // Daytime context
+    int? StressHighSec,
+    int? RecoveryHighSec,
+    int? Steps,
+    int? ActiveCalories,
+    double? Spo2Average,
+    int? BreathingDisturbanceIndex,
+    string? ResilienceLevel,
+    double? ResilienceSleepRecovery,
+    double? ResilienceDaytimeRecovery,
+    // Timeseries
     List<SamplePoint> HrvSeries,
     List<SamplePoint> HeartRateSeries);
 
@@ -135,28 +175,81 @@ public class DashboardQueryService(OuraDbContext db)
             .ThenByDescending(x => (x.DeepSleepDuration ?? 0) + (x.RemSleepDuration ?? 0))
             .FirstOrDefaultAsync(ct);
 
-        var score = await db.DailySleeps
+        var sleep = await db.DailySleeps
             .Where(x => x.UserId == user.Id && x.Day == day)
-            .Select(x => (int?)x.Score).FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(ct);
 
         var readiness = await db.DailyReadinesses
             .Where(x => x.UserId == user.Id && x.Day == day)
-            .Select(x => new { x.Score, x.TemperatureDeviation })
+            .FirstOrDefaultAsync(ct);
+
+        var stress = await db.DailyStresses
+            .Where(x => x.UserId == user.Id && x.Day == day)
+            .Select(x => new { x.StressHigh, x.RecoveryHigh })
+            .FirstOrDefaultAsync(ct);
+
+        var activity = await db.DailyActivities
+            .Where(x => x.UserId == user.Id && x.Day == day)
+            .Select(x => new { x.Steps, x.ActiveCalories })
+            .FirstOrDefaultAsync(ct);
+
+        var spo2 = await db.DailySpo2s
+            .Where(x => x.UserId == user.Id && x.Day == day)
+            .Select(x => new { x.Spo2Average, x.BreathingDisturbanceIndex })
+            .FirstOrDefaultAsync(ct);
+
+        var resilience = await db.DailyResilienceRecords
+            .Where(x => x.UserId == user.Id && x.Day == day)
+            .Select(x => new { x.Level, x.SleepRecovery, x.DaytimeRecovery })
             .FirstOrDefaultAsync(ct);
 
         return new NightData(
             UserName: userName,
             Day: day,
-            SleepScore: score,
+            SleepScore: sleep?.Score,
             ReadinessScore: readiness?.Score,
             TempDeviation: readiness?.TemperatureDeviation,
+            TempTrendDeviation: readiness?.TemperatureTrendDeviation,
             AverageHrv: session?.AverageHrv,
             AverageHeartRate: session?.AverageHeartRate,
             LowestHeartRate: session?.LowestHeartRate,
             AverageBreath: session?.AverageBreath,
             DeepMinutes: session?.DeepSleepDuration is int d ? d / 60 : null,
             RemMinutes: session?.RemSleepDuration is int r ? r / 60 : null,
-            AwakeMinutes: session?.AwakeTime is int a ? a / 60 : null,
+            LightSleepMinutes: session?.LightSleepDuration is int light ? light / 60 : null,
+            AwakeMinutes: session?.AwakeTime is int aw ? aw / 60 : null,
+            TotalSleepMinutes: session?.TotalSleepDuration is int tot ? tot / 60 : null,
+            TimeInBedMinutes: session?.TimeInBed is int tib ? tib / 60 : null,
+            Efficiency: session?.Efficiency,
+            LatencyMinutes: session?.Latency is int lat ? lat / 60 : null,
+            RestlessPeriods: session?.RestlessPeriods,
+            BedtimeStart: session?.BedtimeStart,
+            BedtimeEnd: session?.BedtimeEnd,
+            SleepPhase5Min: session?.SleepPhase5Min,
+            SleepDeepContributor: sleep?.DeepSleepContributor,
+            SleepEfficiencyContributor: sleep?.EfficiencyContributor,
+            SleepLatencyContributor: sleep?.LatencyContributor,
+            SleepRemContributor: sleep?.RemSleepContributor,
+            SleepRestfulnessContributor: sleep?.RestfulnessContributor,
+            SleepTimingContributor: sleep?.TimingContributor,
+            SleepTotalContributor: sleep?.TotalSleepContributor,
+            ReadinessActivityBalance: readiness?.ActivityBalanceContributor,
+            ReadinessBodyTemp: readiness?.BodyTemperatureContributor,
+            ReadinessHrvBalance: readiness?.HrvBalanceContributor,
+            ReadinessPrevDayActivity: readiness?.PreviousDayActivityContributor,
+            ReadinessPrevNight: readiness?.PreviousNightContributor,
+            ReadinessRecoveryIndex: readiness?.RecoveryIndexContributor,
+            ReadinessRhr: readiness?.RestingHeartRateContributor,
+            ReadinessSleepBalance: readiness?.SleepBalanceContributor,
+            StressHighSec: stress?.StressHigh,
+            RecoveryHighSec: stress?.RecoveryHigh,
+            Steps: activity?.Steps,
+            ActiveCalories: activity?.ActiveCalories,
+            Spo2Average: spo2?.Spo2Average,
+            BreathingDisturbanceIndex: spo2?.BreathingDisturbanceIndex,
+            ResilienceLevel: resilience?.Level,
+            ResilienceSleepRecovery: resilience?.SleepRecovery,
+            ResilienceDaytimeRecovery: resilience?.DaytimeRecovery,
             HrvSeries: ParseSeries(session?.HrvSeries),
             HeartRateSeries: ParseSeries(session?.HeartRateSeries));
     }

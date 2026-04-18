@@ -152,7 +152,7 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 |---|---|---|
 | `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
 | `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with "→" detail links |
-| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Intra-night HRV & HR charts (5-min ApexCharts timeseries), 10 scalar stats, prev/next night nav, LLM text export (copy to clipboard) |
+| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Sleep stage timeline bar, intra-night HRV & HR charts, session detail row (bedtime window, efficiency, latency, restless periods, temp trend), daytime context card (steps, SpO2, stress, resilience), score contributors, LLM-ready text export (single copy) |
 | `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
 
@@ -166,9 +166,9 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 
 **`DashboardQueryService`** (Scoped) — all DB reads for the dashboard.
 - `GetUserOverviewAsync(userName, days)` → `UserOverview` with one `DailyOverviewRow` per calendar day. Start date clamped to user’s earliest session so charts don’t open with empty left-side gaps.
-- `GetNightDetailAsync(userName, day)` → `NightData?` — scalars + intra-night `HrvSeries`/`HeartRateSeries` parsed from the session’s JSONB timeseries.
+- `GetNightDetailAsync(userName, day)` → `NightData?` — scalars + intra-night `HrvSeries`/`HeartRateSeries` + sleep stage string + contributors from all 6 tables.
 - `GetNightDaysAsync(userName, days)` → `List<DateOnly>` (descending) — days that have a `long_sleep` session, used for prev/next navigation on the night detail page.
-- Joins: `DailySleep` (score), `DailyReadinesses` (readiness score, temperature deviation), `SleepSessions` (HRV, HR, lowest HR, respiratory rate, deep/REM/awake minutes, JSONB timeseries).
+- Joins: `DailySleep` (score + contributors), `DailyReadinesses` (readiness score, temperature deviation/trend, contributors), `SleepSessions` (HR, HRV, respiratory rate, all duration fields, efficiency, latency, bedtime window, sleep stage string), `DailyStresses`, `DailyActivities`, `DailySpo2s`, `DailyResilienceRecords`.
 - Session preference: `long_sleep` type first, then highest (deep + REM) for the day.
 - Days with no data return a row with all-null metrics (so charts show gaps rather than missing points).
 
@@ -176,7 +176,13 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 `Day`, `SleepScore`, `ReadinessScore`, `AvgHrv`, `AvgHr`, `LowestHr`, `AvgBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `TempDeviation`
 
 **`NightData`** record fields:
-`UserName`, `Day`, `SleepScore`, `ReadinessScore`, `TempDeviation`, `AverageHrv`, `AverageHeartRate`, `LowestHeartRate`, `AverageBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `HrvSeries`, `HeartRateSeries`
+`UserName`, `Day`, `SleepScore`, `ReadinessScore`, `TempDeviation`, `TempTrendDeviation`,
+`AverageHrv`, `AverageHeartRate`, `LowestHeartRate`, `AverageBreath`,
+`DeepMinutes`, `RemMinutes`, `LightSleepMinutes`, `AwakeMinutes`, `TotalSleepMinutes`, `TimeInBedMinutes`, `Efficiency`, `LatencyMinutes`, `RestlessPeriods`, `BedtimeStart`, `BedtimeEnd`, `SleepPhase5Min`,
+`SleepDeepContributor`, `SleepEfficiencyContributor`, `SleepLatencyContributor`, `SleepRemContributor`, `SleepRestfulnessContributor`, `SleepTimingContributor`, `SleepTotalContributor`,
+`ReadinessActivityBalance`, `ReadinessBodyTemp`, `ReadinessHrvBalance`, `ReadinessPrevDayActivity`, `ReadinessPrevNight`, `ReadinessRecoveryIndex`, `ReadinessRhr`, `ReadinessSleepBalance`,
+`StressHighSec`, `RecoveryHighSec`, `Steps`, `ActiveCalories`, `Spo2Average`, `BreathingDisturbanceIndex`, `ResilienceLevel`, `ResilienceSleepRecovery`, `ResilienceDaytimeRecovery`,
+`HrvSeries`, `HeartRateSeries`
 
 **`SamplePoint`** record: `(DateTimeOffset Time, double? Value)` — one point in an intra-night timeseries.
 

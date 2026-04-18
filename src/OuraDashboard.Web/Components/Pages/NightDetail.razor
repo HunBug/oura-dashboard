@@ -56,6 +56,52 @@ else
         <div class="col"><div class="fs-3 fw-bold">@FmtTemp(_detail.TempDeviation)</div><div class="text-muted small">Temp dev</div></div>
     </div>
 
+    @* ── Session details row ── *@
+    <div class="row text-center mb-3 g-2">
+        @if (_detail.BedtimeStart.HasValue && _detail.BedtimeEnd.HasValue)
+        {
+            <div class="col">
+                <div class="fs-5 fw-bold">@_detail.BedtimeStart.Value.ToLocalTime().ToString("HH:mm") – @_detail.BedtimeEnd.Value.ToLocalTime().ToString("HH:mm")</div>
+                <div class="text-muted small">Bedtime window</div>
+            </div>
+        }
+        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TotalSleepMinutes)</div><div class="text-muted small">Total sleep</div></div>
+        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LightSleepMinutes)</div><div class="text-muted small">Light (min)</div></div>
+        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TimeInBedMinutes)</div><div class="text-muted small">Time in bed</div></div>
+        <div class="col"><div class="fs-5 fw-bold">@(_detail.Efficiency.HasValue ? _detail.Efficiency + "%" : "—")</div><div class="text-muted small">Efficiency</div></div>
+        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LatencyMinutes)</div><div class="text-muted small">Sleep latency</div></div>
+        <div class="col"><div class="fs-5 fw-bold">@(_detail.RestlessPeriods?.ToString() ?? "—")</div><div class="text-muted small">Restless periods</div></div>
+        @if (_detail.TempTrendDeviation.HasValue)
+        {
+            <div class="col">
+                <div class="fs-5 fw-bold @(_detail.TempTrendDeviation >= 0 ? "text-warning" : "text-info")">@((_detail.TempTrendDeviation >= 0 ? "+" : "") + _detail.TempTrendDeviation.Value.ToString("F2")) °C</div>
+                <div class="text-muted small">Temp trend</div>
+            </div>
+        }
+    </div>
+
+    @* ── Sleep stage timeline ── *@
+    @if (!string.IsNullOrEmpty(_detail.SleepPhase5Min))
+    {
+        <div class="card mb-4">
+            <div class="card-header text-muted small d-flex gap-4 align-items-center flex-wrap">
+                <span>Sleep stages (5-min blocks)</span>
+                <span><span style="color:#f0ad4e">■</span> Awake</span>
+                <span><span style="color:#74b9ff">■</span> Light</span>
+                <span><span style="color:#0984e3">■</span> Deep</span>
+                <span><span style="color:#a29bfe">■</span> REM</span>
+            </div>
+            <div class="card-body p-2">
+                <div style="display:flex;width:100%;height:28px;border-radius:4px;overflow:hidden;">
+                    @foreach (var seg in BuildSleepStageSegments(_detail.SleepPhase5Min))
+                    {
+                        <div style="flex:@seg.Count;background:@seg.Color;" title="@seg.Label (@(seg.Count * 5) min)"></div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
     @* ── Intra-night HRV chart ── *@
     @if (_detail.HrvSeries.Count > 0)
     {
@@ -84,6 +130,67 @@ else
                         XValue="p => p.Time.LocalDateTime"
                         YValue="p => (decimal?)p.Value" />
                 </ApexChart>
+            </div>
+        </div>
+    }
+
+    @* ── Daytime context ── *@
+    @if (_detail.Steps.HasValue || _detail.Spo2Average.HasValue
+        || _detail.StressHighSec.HasValue || _detail.ResilienceLevel is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header text-muted small">Daytime context</div>
+            <div class="card-body">
+                <div class="row text-center g-3">
+                    @foreach (var item in GetDaytimeItems(_detail))
+                    {
+                        <div class="col-6 col-md-3">
+                            <div class="fs-5 fw-bold">@item.Value</div>
+                            <div class="text-muted small">@item.Label</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ── Score contributors ── *@
+    @if (_detail.SleepDeepContributor.HasValue || _detail.SleepEfficiencyContributor.HasValue
+        || _detail.ReadinessHrvBalance.HasValue || _detail.ReadinessRhr.HasValue)
+    {
+        <div class="card mb-4">
+            <div class="card-header text-muted small">Score contributors (0–100)</div>
+            <div class="card-body">
+                @if (_detail.SleepDeepContributor.HasValue || _detail.SleepEfficiencyContributor.HasValue)
+                {
+                    <div class="mb-2 text-muted small fw-semibold">Sleep</div>
+                    <div class="row g-2 mb-3">
+                        @foreach (var c in GetSleepContribItems(_detail))
+                        {
+                            <div class="col-auto">
+                                <div class="border rounded text-center px-2 py-1">
+                                    <div class="fw-bold">@c.Value</div>
+                                    <div class="text-muted" style="font-size:0.72rem">@c.Label</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (_detail.ReadinessHrvBalance.HasValue || _detail.ReadinessRhr.HasValue)
+                {
+                    <div class="mb-2 text-muted small fw-semibold">Readiness</div>
+                    <div class="row g-2">
+                        @foreach (var c in GetReadinessContribItems(_detail))
+                        {
+                            <div class="col-auto">
+                                <div class="border rounded text-center px-2 py-1">
+                                    <div class="fw-bold">@c.Value</div>
+                                    <div class="text-muted" style="font-size:0.72rem">@c.Label</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         </div>
     }
@@ -157,25 +264,94 @@ else
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"=== Oura Night Data: {d.UserName}, {d.Day:yyyy-MM-dd} ({d.Day:dddd}) ===");
         sb.AppendLine();
+
+        if (d.BedtimeStart.HasValue && d.BedtimeEnd.HasValue)
+        {
+            sb.AppendLine("SLEEP WINDOW");
+            sb.AppendLine($"  Bedtime      : {d.BedtimeStart.Value.ToLocalTime():HH:mm} – {d.BedtimeEnd.Value.ToLocalTime():HH:mm}");
+            sb.AppendLine();
+        }
+
         sb.AppendLine("SCORES");
         sb.AppendLine($"  Sleep score  : {d.SleepScore?.ToString() ?? "N/A"}");
         sb.AppendLine($"  Readiness    : {d.ReadinessScore?.ToString() ?? "N/A"}");
         sb.AppendLine($"  Temp dev     : {(d.TempDeviation.HasValue ? (d.TempDeviation >= 0 ? "+" : "") + d.TempDeviation.Value.ToString("F2") + " °C" : "N/A")}");
+        sb.AppendLine($"  Temp trend   : {(d.TempTrendDeviation.HasValue ? (d.TempTrendDeviation >= 0 ? "+" : "") + d.TempTrendDeviation.Value.ToString("F2") + " °C" : "N/A")}");
         sb.AppendLine();
+
         sb.AppendLine("HEART RATE & HRV");
         sb.AppendLine($"  Avg HRV      : {(d.AverageHrv.HasValue ? d.AverageHrv + " ms" : "N/A")}");
         sb.AppendLine($"  Avg HR       : {(d.AverageHeartRate.HasValue ? d.AverageHeartRate.Value.ToString("F1") + " bpm" : "N/A")}");
         sb.AppendLine($"  Lowest HR    : {(d.LowestHeartRate.HasValue ? d.LowestHeartRate + " bpm" : "N/A")}");
         sb.AppendLine($"  Resp rate    : {(d.AverageBreath.HasValue ? d.AverageBreath.Value.ToString("F1") + " brpm" : "N/A")}");
         sb.AppendLine();
+
         sb.AppendLine("SLEEP STAGES");
         sb.AppendLine($"  Deep sleep   : {(d.DeepMinutes.HasValue ? d.DeepMinutes + " min" : "N/A")}");
         sb.AppendLine($"  REM sleep    : {(d.RemMinutes.HasValue ? d.RemMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  Light sleep  : {(d.LightSleepMinutes.HasValue ? d.LightSleepMinutes + " min" : "N/A")}");
         sb.AppendLine($"  Awake        : {(d.AwakeMinutes.HasValue ? d.AwakeMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  Total sleep  : {(d.TotalSleepMinutes.HasValue ? d.TotalSleepMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  Time in bed  : {(d.TimeInBedMinutes.HasValue ? d.TimeInBedMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  Efficiency   : {(d.Efficiency.HasValue ? d.Efficiency + "%" : "N/A")}");
+        sb.AppendLine($"  Latency      : {(d.LatencyMinutes.HasValue ? d.LatencyMinutes + " min" : "N/A")}");
+        sb.AppendLine($"  Restless     : {(d.RestlessPeriods.HasValue ? d.RestlessPeriods + " periods" : "N/A")}");
+
+        if (!string.IsNullOrEmpty(d.SleepPhase5Min))
+        {
+            var awakeMin = d.SleepPhase5Min.Count(c => c == '1') * 5;
+            var lightMin  = d.SleepPhase5Min.Count(c => c == '2') * 5;
+            var deepMin   = d.SleepPhase5Min.Count(c => c == '3') * 5;
+            var remMin    = d.SleepPhase5Min.Count(c => c == '4') * 5;
+            sb.AppendLine($"  Stage breakdown (5-min res): awake={awakeMin}min light={lightMin}min deep={deepMin}min rem={remMin}min");
+        }
+        sb.AppendLine();
+
+        if (d.SleepDeepContributor.HasValue || d.SleepEfficiencyContributor.HasValue)
+        {
+            sb.AppendLine("SLEEP SCORE CONTRIBUTORS");
+            if (d.SleepDeepContributor.HasValue)        sb.AppendLine($"  Deep sleep   : {d.SleepDeepContributor}");
+            if (d.SleepEfficiencyContributor.HasValue)  sb.AppendLine($"  Efficiency   : {d.SleepEfficiencyContributor}");
+            if (d.SleepLatencyContributor.HasValue)     sb.AppendLine($"  Latency      : {d.SleepLatencyContributor}");
+            if (d.SleepRemContributor.HasValue)         sb.AppendLine($"  REM          : {d.SleepRemContributor}");
+            if (d.SleepRestfulnessContributor.HasValue) sb.AppendLine($"  Restfulness  : {d.SleepRestfulnessContributor}");
+            if (d.SleepTimingContributor.HasValue)      sb.AppendLine($"  Timing       : {d.SleepTimingContributor}");
+            if (d.SleepTotalContributor.HasValue)       sb.AppendLine($"  Total sleep  : {d.SleepTotalContributor}");
+            sb.AppendLine();
+        }
+
+        if (d.ReadinessHrvBalance.HasValue || d.ReadinessRhr.HasValue)
+        {
+            sb.AppendLine("READINESS SCORE CONTRIBUTORS");
+            if (d.ReadinessActivityBalance.HasValue)  sb.AppendLine($"  Activity bal : {d.ReadinessActivityBalance}");
+            if (d.ReadinessBodyTemp.HasValue)         sb.AppendLine($"  Body temp    : {d.ReadinessBodyTemp}");
+            if (d.ReadinessHrvBalance.HasValue)       sb.AppendLine($"  HRV balance  : {d.ReadinessHrvBalance}");
+            if (d.ReadinessPrevDayActivity.HasValue)  sb.AppendLine($"  Prev day act : {d.ReadinessPrevDayActivity}");
+            if (d.ReadinessPrevNight.HasValue)        sb.AppendLine($"  Prev night   : {d.ReadinessPrevNight}");
+            if (d.ReadinessRecoveryIndex.HasValue)    sb.AppendLine($"  Recovery idx : {d.ReadinessRecoveryIndex}");
+            if (d.ReadinessRhr.HasValue)              sb.AppendLine($"  Resting HR   : {d.ReadinessRhr}");
+            if (d.ReadinessSleepBalance.HasValue)     sb.AppendLine($"  Sleep balance: {d.ReadinessSleepBalance}");
+            sb.AppendLine();
+        }
+
+        var hasDayData = d.Steps.HasValue || d.Spo2Average.HasValue || d.StressHighSec.HasValue || d.ResilienceLevel is not null;
+        if (hasDayData)
+        {
+            sb.AppendLine("DAYTIME CONTEXT");
+            if (d.Steps.HasValue)                       sb.AppendLine($"  Steps        : {d.Steps.Value:N0}");
+            if (d.ActiveCalories.HasValue)              sb.AppendLine($"  Active kcal  : {d.ActiveCalories}");
+            if (d.Spo2Average.HasValue)                 sb.AppendLine($"  SpO2 avg     : {d.Spo2Average.Value:F1}%");
+            if (d.BreathingDisturbanceIndex.HasValue)   sb.AppendLine($"  Breathing DI : {d.BreathingDisturbanceIndex}");
+            if (d.StressHighSec.HasValue)               sb.AppendLine($"  High stress  : {d.StressHighSec.Value / 60} min");
+            if (d.RecoveryHighSec.HasValue)             sb.AppendLine($"  High recovery: {d.RecoveryHighSec.Value / 60} min");
+            if (d.ResilienceLevel is not null)          sb.AppendLine($"  Resilience   : {d.ResilienceLevel}");
+            if (d.ResilienceSleepRecovery.HasValue)     sb.AppendLine($"  Sleep recov  : {d.ResilienceSleepRecovery.Value:F2}");
+            if (d.ResilienceDaytimeRecovery.HasValue)   sb.AppendLine($"  Day recov    : {d.ResilienceDaytimeRecovery.Value:F2}");
+            sb.AppendLine();
+        }
 
         if (d.HrvSeries.Count > 0)
         {
-            sb.AppendLine();
             sb.AppendLine("INTRA-NIGHT HRV (5-min intervals, ms — null = no signal)");
             sb.Append("  ");
             sb.AppendLine(string.Join(", ", d.HrvSeries.Select(p =>
@@ -194,7 +370,68 @@ else
         return sb.ToString();
     }
 
-    private static string Fmt(int? v)       => v.HasValue ? v.Value.ToString() : "—";
-    private static string FmtD(double? v)   => v.HasValue ? v.Value.ToString("F1") : "—";
+    private static string Fmt(int? v)        => v.HasValue ? v.Value.ToString() : "—";
+    private static string FmtD(double? v)    => v.HasValue ? v.Value.ToString("F1") : "—";
     private static string FmtTemp(double? v) => v.HasValue ? (v.Value >= 0 ? "+" : "") + v.Value.ToString("F2") + " °C" : "—";
+    private static string FmtMin(int? minutes) => minutes.HasValue
+        ? minutes.Value >= 60 ? $"{minutes.Value / 60}h {minutes.Value % 60}m" : $"{minutes.Value} min"
+        : "—";
+
+    private record SleepStageSegment(int Count, string Color, string Label);
+
+    private static IEnumerable<SleepStageSegment> BuildSleepStageSegments(string phase)
+    {
+        var i = 0;
+        while (i < phase.Length)
+        {
+            var ch = phase[i];
+            var count = 0;
+            while (i < phase.Length && phase[i] == ch) { count++; i++; }
+            var (color, label) = ch switch
+            {
+                '1' => ("#f0ad4e", "Awake"),
+                '2' => ("#74b9ff", "Light"),
+                '3' => ("#0984e3", "Deep"),
+                '4' => ("#a29bfe", "REM"),
+                _   => ("#e0e0e0", "Unknown"),
+            };
+            yield return new SleepStageSegment(count, color, label);
+        }
+    }
+
+    private static IEnumerable<(string Label, string? Value)> GetDaytimeItems(NightData d)
+    {
+        if (d.Steps.HasValue)                     yield return ("Steps",            d.Steps.Value.ToString("N0"));
+        if (d.ActiveCalories.HasValue)            yield return ("Active kcal",      d.ActiveCalories.ToString()!);
+        if (d.Spo2Average.HasValue)               yield return ("SpO2 avg",         d.Spo2Average.Value.ToString("F1") + "%");
+        if (d.BreathingDisturbanceIndex.HasValue) yield return ("Breathing dist. idx", d.BreathingDisturbanceIndex.ToString()!);
+        if (d.StressHighSec.HasValue)             yield return ("High stress",      (d.StressHighSec.Value / 60) + " min");
+        if (d.RecoveryHighSec.HasValue)           yield return ("High recovery",    (d.RecoveryHighSec.Value / 60) + " min");
+        if (d.ResilienceLevel is not null)        yield return ("Resilience",       d.ResilienceLevel);
+        if (d.ResilienceSleepRecovery.HasValue)   yield return ("Sleep recovery",   d.ResilienceSleepRecovery.Value.ToString("F2"));
+        if (d.ResilienceDaytimeRecovery.HasValue) yield return ("Daytime recovery", d.ResilienceDaytimeRecovery.Value.ToString("F2"));
+    }
+
+    private static IEnumerable<(string Label, int? Value)> GetSleepContribItems(NightData d)
+    {
+        if (d.SleepDeepContributor.HasValue)        yield return ("Deep",        d.SleepDeepContributor);
+        if (d.SleepEfficiencyContributor.HasValue)  yield return ("Efficiency",  d.SleepEfficiencyContributor);
+        if (d.SleepLatencyContributor.HasValue)     yield return ("Latency",     d.SleepLatencyContributor);
+        if (d.SleepRemContributor.HasValue)         yield return ("REM",         d.SleepRemContributor);
+        if (d.SleepRestfulnessContributor.HasValue) yield return ("Restfulness", d.SleepRestfulnessContributor);
+        if (d.SleepTimingContributor.HasValue)      yield return ("Timing",      d.SleepTimingContributor);
+        if (d.SleepTotalContributor.HasValue)       yield return ("Total sleep", d.SleepTotalContributor);
+    }
+
+    private static IEnumerable<(string Label, int? Value)> GetReadinessContribItems(NightData d)
+    {
+        if (d.ReadinessActivityBalance.HasValue)  yield return ("Activity balance", d.ReadinessActivityBalance);
+        if (d.ReadinessBodyTemp.HasValue)         yield return ("Body temp",        d.ReadinessBodyTemp);
+        if (d.ReadinessHrvBalance.HasValue)       yield return ("HRV balance",      d.ReadinessHrvBalance);
+        if (d.ReadinessPrevDayActivity.HasValue)  yield return ("Prev day activity",d.ReadinessPrevDayActivity);
+        if (d.ReadinessPrevNight.HasValue)        yield return ("Prev night",       d.ReadinessPrevNight);
+        if (d.ReadinessRecoveryIndex.HasValue)    yield return ("Recovery index",   d.ReadinessRecoveryIndex);
+        if (d.ReadinessRhr.HasValue)              yield return ("Resting HR",       d.ReadinessRhr);
+        if (d.ReadinessSleepBalance.HasValue)     yield return ("Sleep balance",    d.ReadinessSleepBalance);
+    }
 }

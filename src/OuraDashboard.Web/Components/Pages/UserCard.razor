@@ -5,7 +5,14 @@
 <div class="card h-100">
     <div class="card-header fw-semibold fs-5 d-flex justify-content-between align-items-center">
         <span>@Overview.UserName</span>
-        <a href="user/@Overview.UserName" class="btn btn-sm btn-outline-secondary">Detail →</a>
+        <div class="d-flex gap-2">
+            @{ var lastNight = Overview.Rows.LastOrDefault(r => r.SleepScore.HasValue)?.Day; }
+            @if (lastNight.HasValue)
+            {
+                <a href="night/@Overview.UserName/@lastNight.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-primary">Last night →</a>
+            }
+            <a href="user/@Overview.UserName" class="btn btn-sm btn-outline-secondary">Detail →</a>
+        </div>
     </div>
     <div class="card-body">
 
