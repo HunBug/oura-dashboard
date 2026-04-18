@@ -65,12 +65,15 @@ This means the schema can be extended later without re-fetching from Oura.
 | `Users` | `Id`, `Name`, `OuraToken` (encrypted at rest) |
 | `DailySleep` | `UserId`, `Day`, `Score`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `Efficiency`, `RawJson` |
 | `SleepSession` | `UserId`, `Day`, `SessionStart`, `SessionEnd`, `AvgHr`, `AvgHrv`, `AvgBreath`, `HrTimeSeries` (JSONB), `HrvTimeSeries` (JSONB), `SleepStages` (JSONB), `RawJson` |
-| `DailyReadiness` | `UserId`, `Day`, `Score`, `RhrContributor`, `HrvBalanceContributor`, `RawJson` |
+| `DailyReadiness` | `UserId`, `Day`, `Score`, `RhrContributor`, `HrvBalanceContributor`, `TemperatureDeviation`, `RawJson` |
 | `HeartRateSample` | `UserId`, `Timestamp`, `Bpm`, `Source` — minute-by-minute, high volume |
 | `DailyStress` | `UserId`, `Day`, `StressHigh`, `RecoveryHigh`, `DaytimeStressScore`, `RawJson` |
-| `DailyHrv` | `UserId`, `Day`, `AvgHrv5Min`, `RawJson` |
 | `DailyActivity` | `UserId`, `Day`, `Steps`, `ActiveCalories`, `RawJson` |
 | `Vo2Max` | `UserId`, `Day`, `Vo2Max`, `RawJson` |
+| `DailySpo2` | `UserId`, `Day`, `BreathingDisturbanceIndex`, `Spo2Average`, `RawJson` |
+| `DailyResilience` | `UserId`, `Day`, `Level` (string: limited/adequate/solid/strong/exceptional), `SleepRecovery`, `DaytimeRecovery`, `Stress`, `RawJson` |
+| `Workouts` | `UserId`, `Day`, `Activity`, `Calories`, `Distance`, `Intensity`, `Source`, `StartDatetime`, `EndDatetime`, `RawJson` |
+| `DailyHrvs` | Dead table — `daily_hrv` endpoint does not exist in the Oura API. Never written to; retained for migration history. |
 
 `HeartRateSample` will be large (~1440 rows/user/day). Consider a partial index on `(UserId, Timestamp)` and a retention policy if disk matters.
 
@@ -114,13 +117,15 @@ Thin console app — just parses args and calls `OuraSyncService`.
 | Endpoint | Notes |
 |---|---|
 | `GET /v2/usercollection/daily_sleep` | Daily sleep score + contributors |
-| `GET /v2/usercollection/sleep` | Per-session detail: HR, HRV, stages |
+| `GET /v2/usercollection/sleep` | Per-session detail: HR, HRV, stages, intra-night timeseries |
 | `GET /v2/usercollection/daily_readiness` | Readiness score + contributors |
 | `GET /v2/usercollection/heartrate` | Minute-by-minute HR (datetime params) |
 | `GET /v2/usercollection/daily_stress` | Daytime stress + recovery |
-| `GET /v2/usercollection/daily_hrv` | Daytime HRV average |
 | `GET /v2/usercollection/daily_activity` | Steps, calories, activity intensity |
-| `GET /v2/usercollection/vo2_max` | VO2 max estimate |
+| `GET /v2/usercollection/vO2_max` | VO2 max estimate (note capital O in path) |
+| `GET /v2/usercollection/daily_spo2` | Blood oxygen saturation + breathing disturbance index |
+| `GET /v2/usercollection/daily_resilience` | Recovery resilience level + components |
+| `GET /v2/usercollection/workout` | Workout sessions: activity type, calories, distance, intensity |
 
 ### Scheduling options
 
@@ -146,7 +151,8 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 | Route | Component | Status |
 |---|---|---|
 | `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
-| `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with all columns |
+| `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with "→" detail links |
+| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Intra-night HRV & HR charts (5-min ApexCharts timeseries), 10 scalar stats, prev/next night nav, LLM text export (copy to clipboard) |
 | `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
 
@@ -159,13 +165,20 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 ### Services
 
 **`DashboardQueryService`** (Scoped) — all DB reads for the dashboard.
-- `GetUserOverviewAsync(userName, days)` → `UserOverview` with one `DailyOverviewRow` per calendar day.
-- Joins: `DailySleep` (score), `DailyReadinesses` (readiness score, temperature deviation), `SleepSessions` (HRV, HR, lowest HR, respiratory rate, deep/REM/awake minutes).
+- `GetUserOverviewAsync(userName, days)` → `UserOverview` with one `DailyOverviewRow` per calendar day. Start date clamped to user’s earliest session so charts don’t open with empty left-side gaps.
+- `GetNightDetailAsync(userName, day)` → `NightData?` — scalars + intra-night `HrvSeries`/`HeartRateSeries` parsed from the session’s JSONB timeseries.
+- `GetNightDaysAsync(userName, days)` → `List<DateOnly>` (descending) — days that have a `long_sleep` session, used for prev/next navigation on the night detail page.
+- Joins: `DailySleep` (score), `DailyReadinesses` (readiness score, temperature deviation), `SleepSessions` (HRV, HR, lowest HR, respiratory rate, deep/REM/awake minutes, JSONB timeseries).
 - Session preference: `long_sleep` type first, then highest (deep + REM) for the day.
 - Days with no data return a row with all-null metrics (so charts show gaps rather than missing points).
 
 **`DailyOverviewRow`** record fields:
 `Day`, `SleepScore`, `ReadinessScore`, `AvgHrv`, `AvgHr`, `LowestHr`, `AvgBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `TempDeviation`
+
+**`NightData`** record fields:
+`UserName`, `Day`, `SleepScore`, `ReadinessScore`, `TempDeviation`, `AverageHrv`, `AverageHeartRate`, `LowestHeartRate`, `AverageBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `HrvSeries`, `HeartRateSeries`
+
+**`SamplePoint`** record: `(DateTimeOffset Time, double? Value)` — one point in an intra-night timeseries.
 
 ### Shared components
 
@@ -176,9 +189,10 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 
 ### Known Oura API notes (from live data)
 
-- `GET /v2/usercollection/daily_hrv` returns **404** for both users — endpoint not available on their subscription plan.
-- `GET /v2/usercollection/vo2_max` returns **404** — same reason.
+- `GET /v2/usercollection/daily_hrv` — **endpoint does not exist** in the Oura API (not just unavailable; the path is invalid). HRV data lives inside sleep sessions (`average_hrv`, `hrv` timeseries). The `DailyHrvs` table is a dead leftover.
+- `GET /v2/usercollection/vO2_max` — **capital O is required** in the path. `vo2_max` (lowercase) returns 404. Both users return data once the casing is correct.
 - `TemperatureDeviation` in `DailyReadiness` **is** populated from the readiness endpoint.
+- ApexCharts JS **mutates the options object** in-place during chart initialization. Each chart on a page must have its own separate `ApexChartOptions<T>` instance — sharing one object causes all charts after the first to render blank or with wrong axis bounds.
 
 ### Custom metrics — planned 🔲
 

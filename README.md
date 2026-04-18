@@ -18,7 +18,8 @@ Private Oura Ring data dashboard for a local home server. Pulls raw data from th
 | Route | What you get |
 |---|---|
 | `/` | Side-by-side 30-day overview cards for both users — sleep score, readiness, HRV, HR, respiratory rate, deep/REM sparklines |
-| `/user/{name}` | Full per-user detail: 4 charts, 9 aggregate stats, per-night data table |
+| `/user/{name}` | Full per-user detail: 4 charts, 9 aggregate stats, per-night data table with "→" links |
+| `/night/{name}/{day}` | Single-night drill-down: intra-night HRV & HR charts, all scalars, LLM-ready text export |
 | `/compare` | Boo vs Maa side-by-side — sleep score + HRV overlay charts, per-night comparison table |
 | `/sync` | Live sync status, per-user result counts, manual Refresh button |
 
@@ -44,8 +45,10 @@ Copy `appsettings.example.json` to `src/OuraDashboard.Web/appsettings.json` and 
 ### 3. Run migrations
 
 ```bash
-dotnet ef database update --project src/OuraDashboard.Data --startup-project src/OuraDashboard.Web
+dotnet run --project src/OuraDashboard.Sync.Cli -- --migrate
 ```
+
+(The `dotnet ef database update` command doesn't work directly because `OuraDbContextFactory` uses a fallback connection string. The CLI reads the real connection string from `appsettings.json`.)
 
 ### 4. Bulk-import historical data (first time)
 
