@@ -1,0 +1,268 @@
+@page "/metrics"
+@rendermode InteractiveServer
+
+<PageTitle>Metrics Guide — OuraDashboard</PageTitle>
+
+<div class="container py-4" style="max-width: 860px;">
+    <h1 class="mb-1">Custom Metrics Guide</h1>
+    <p class="text-muted mb-4">
+        Every metric shown on a night detail page is computed on the fly from the raw
+        intra-night HR and HRV timeseries stored in the database.
+        None of these numbers come from Oura — they're our own attempt to tell a truer story.
+        Charts on the night detail page also overlay Oura's own reported values as dashed markers
+        so you can see where Oura's numbers sit relative to the actual distribution.
+    </p>
+
+    @* ── Real Recovery Score ── *@
+    <div class="card mb-4" id="rrs">
+        <div class="card-header fw-semibold">Real Recovery Score (0–100)</div>
+        <div class="card-body">
+            <p>
+                A single composite number designed to reflect how well the body actually recovered,
+                rather than how Oura's algorithm scored the night. A score of 100 means every
+                component hit its target; a near-zero score means very little recovery happened.
+            </p>
+            <p>The score is built from four components, each weighted independently:</p>
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Component</th>
+                        <th>Weight</th>
+                        <th>How it's calculated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>HR below 75 bpm</td>
+                        <td>35 pts</td>
+                        <td>
+                            <code>(1 − % of night above 75 bpm) × 35</code>.<br/>
+                            If HR stayed below 75 bpm for the entire night → 35 pts.
+                            If HR was above 75 bpm the whole night → 0 pts.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Average HRV</td>
+                        <td>25 pts</td>
+                        <td>
+                            <code>min(avgHrv / 20, 1) × 25</code>.<br/>
+                            Linear from 0 ms (0 pts) up to 20 ms (25 pts). Values above 20 ms are capped at full points.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Restorative sleep</td>
+                        <td>25 pts</td>
+                        <td>
+                            <code>min((deep + REM) / 150, 1) × 25</code>.<br/>
+                            Target is 150 minutes of combined deep and REM sleep. Less than that scales linearly.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Respiratory rate</td>
+                        <td>15 pts</td>
+                        <td>
+                            ≤ 14 brpm → 15 pts. ≥ 18 brpm → 0 pts. Linear between 14 and 18. <br/>
+                            Lower respiratory rate typically indicates better parasympathetic activation.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="text-muted small">
+                <strong>Normalisation:</strong> if a component's data is missing (e.g. no HR timeseries),
+                its weight is dropped and the score is re-normalised over what was available.
+                This means a perfect score is still achievable with incomplete data, but it's labelled
+                for what it is. Watch for nights where the timeseries is short or patchy.
+            </p>
+            <p class="text-muted small">
+                <strong>Calibration note:</strong> the thresholds (75 bpm / 20 ms / 150 min / 14-18 brpm)
+                were chosen to reflect Maa's physiology. They will be adjusted as more data accumulates.
+                The formula itself is transparent and easy to change.
+            </p>
+        </div>
+    </div>
+
+    @* ── HR above 75 bpm ── *@
+    <div class="card mb-4" id="hr75">
+        <div class="card-header fw-semibold">HR above 75 bpm — % of night</div>
+        <div class="card-body">
+            <p>
+                The percentage of 5-minute HR samples taken during the sleep session where
+                heart rate was <em>above</em> 75 bpm.
+                Null samples (ring not in contact, signal lost) are excluded from the count.
+            </p>
+            <p>
+                <strong>Why this matters:</strong> Oura reports a "lowest HR" (the brief overnight dip)
+                and an average. Neither tells you how much of the night the heart was actually
+                elevated. A 10-minute dip to 59 bpm can coexist with HR spending 70% of the night
+                above 75 bpm — and Oura will report that dip as though it defines the night.
+                This metric exposes that dynamic directly.
+            </p>
+            <p>
+                <strong>Rough thresholds:</strong>
+                &lt; 10% → good recovery; 10–30% → moderate; 30–60% → elevated; &gt; 60% → poor.
+                These will shift based on individual baseline.
+            </p>
+        </div>
+    </div>
+
+    @* ── HR above 80 bpm ── *@
+    <div class="card mb-4" id="hr80">
+        <div class="card-header fw-semibold">HR above 80 bpm — % of night</div>
+        <div class="card-body">
+            <p>
+                Same calculation as the 75 bpm metric but with a stricter threshold.
+                Useful for detecting nights with significant sympathetic activation.
+                When this number is non-trivial (above ~10%), the autonomic system was probably
+                processing something — stress, illness onset, temperature, or alcohol.
+            </p>
+        </div>
+    </div>
+
+    @* ── HR Settling Time ── *@
+    <div class="card mb-4" id="settling">
+        <div class="card-header fw-semibold">HR Settling Time</div>
+        <div class="card-body">
+            <p>
+                The number of minutes from the start of the sleep session until HR first
+                "settles" below 75 bpm — defined as <strong>3 or more consecutive 5-minute samples
+                all at or below 75 bpm</strong>.
+            </p>
+            <p>
+                If HR never meets this criterion for any 3-in-a-row stretch, the metric shows
+                <em>"Never"</em>. This means cardiac arousal never fully resolved during sleep.
+            </p>
+            <p>
+                <strong>Why 3 consecutive samples?</strong> A single sub-75 reading could be a
+                positional artifact or brief dip. Three consecutive readings (15 minutes) is a
+                meaningful sustained change.
+            </p>
+            <p>
+                <strong>Rough thresholds:</strong>
+                &lt; 20 min → fast settling, good; 20–45 min → normal; &gt; 45 min → slow settling;
+                "Never" → significant finding.
+            </p>
+        </div>
+    </div>
+
+    @* ── HRV Distribution ── *@
+    <div class="card mb-4" id="hrv-dist">
+        <div class="card-header fw-semibold">HRV Distribution — three buckets</div>
+        <div class="card-body">
+            <p>
+                The HRV timeseries from the sleep session is split into three bands:
+            </p>
+            <ul>
+                <li><strong class="text-danger">Below 12 ms</strong> — poor autonomic recovery zone. High parasympathetic suppression.</li>
+                <li><strong class="text-warning">12–20 ms</strong> — moderate zone.</li>
+                <li><strong class="text-success">Above 20 ms</strong> — good recovery zone.</li>
+            </ul>
+            <p>
+                <strong>Why not just show the average?</strong> A night where HRV alternates between
+                4 ms and 40 ms averages to 22 ms — which looks fine. The distribution reveals that
+                half the night was in suppression. The average hides this completely.
+            </p>
+            <p>
+                <strong>Thresholds:</strong> 12 ms and 20 ms are used as approximate population/clinical
+                reference points. They may need adjustment once more personal baseline data is collected.
+            </p>
+        </div>
+    </div>
+
+    @* ── HRV Peak ── *@
+    <div class="card mb-4" id="hrv-peak">
+        <div class="card-header fw-semibold">HRV Peak</div>
+        <div class="card-body">
+            <p>
+                The highest single 5-minute HRV sample recorded during the night.
+                Represents the best the autonomic system managed during that sleep session.
+            </p>
+            <p>
+                Compare this against the average HRV to gauge how uniform recovery was.
+                A large gap between peak and average suggests the body briefly achieved good
+                recovery but couldn't sustain it.
+            </p>
+        </div>
+    </div>
+
+    @* ── HRV Direction ── *@
+    <div class="card mb-4" id="hrv-dir">
+        <div class="card-header fw-semibold">HRV Direction</div>
+        <div class="card-body">
+            <p>
+                Compares the mean HRV of the <strong>first half</strong> of the night against the
+                mean of the <strong>second half</strong>.
+            </p>
+            <ul>
+                <li><strong class="text-success">Improving ↑</strong> — late-night average is more than 2 ms above early-night average.
+                    HRV is building as sleep deepens, which is the healthy pattern (parasympathetic recovery
+                    typically peaks in the second half of sleep).</li>
+                <li><strong class="text-danger">Declining ↓</strong> — late-night average more than 2 ms below early.
+                    Recovery is waning — could indicate fragmented sleep, early waking, or sustained stress response.</li>
+                <li><strong>Flat →</strong> — difference within ±2 ms dead-band. No clear direction.</li>
+            </ul>
+            <p>
+                <strong>Note about Boo:</strong> Boo consistently shows an improving pattern across the night
+                (early low, late high). This is unusual and worth tracking as a characteristic signature.
+            </p>
+        </div>
+    </div>
+
+    @* ── Restorative Sleep ── *@
+    <div class="card mb-4" id="restorative">
+        <div class="card-header fw-semibold">Restorative Sleep (Deep + REM)</div>
+        <div class="card-body">
+            <p>
+                Deep and REM stages combined in minutes.
+            </p>
+            <p>
+                <strong>Why combine them?</strong> Deep sleep (slow-wave) handles physical restoration,
+                immune function, and memory consolidation. REM handles emotional regulation and
+                cognitive integration. Both are "restorative" in complementary ways — and both
+                tend to be suppressed on the same bad nights (alcohol, stress, illness). Showing
+                them together and separately lets you see which was hit.
+            </p>
+            <p>
+                <strong>The 150-minute target</strong> is a rough heuristic used in the Real Recovery Score.
+                It's not a hard clinical threshold — more data will reveal personal baselines. A night
+                with 90+ minutes is generally decent; under 60 minutes is a concern.
+            </p>
+            <p>
+                These are Oura's classified minutes and inherit whatever limitations Oura's staging has.
+                The number is still useful for trends even if exact values aren't perfectly accurate.
+            </p>
+        </div>
+    </div>
+
+    @* ── Oura markers on charts ── *@
+    <div class="card mb-4" id="oura-markers">
+        <div class="card-header fw-semibold">Oura Score Markers on Charts</div>
+        <div class="card-body">
+            <p>
+                On the intra-night HR and HRV charts, horizontal reference lines are overlaid:
+            </p>
+            <p><strong>HRV chart:</strong></p>
+            <ul>
+                <li>A grey dashed line at the HRV average Oura reported (e.g. "22 ms").</li>
+                <li>Green reference line at 20 ms — top of the moderate zone.</li>
+                <li>Red reference line at 12 ms — bottom of the moderate zone.</li>
+            </ul>
+            <p><strong>HR chart:</strong></p>
+            <ul>
+                <li>A grey dashed line at Oura's reported average HR.</li>
+                <li>A blue dashed line at Oura's reported lowest HR.</li>
+                <li>Orange reference line at 75 bpm — threshold for the HR % metric.</li>
+                <li>Red reference line at 80 bpm — stricter threshold.</li>
+            </ul>
+            <p>
+                The goal is to make it visually obvious when Oura's single-number summary
+                misrepresents what the timeseries actually shows.
+            </p>
+        </div>
+    </div>
+
+    <p class="text-muted small mt-4">
+        All custom metrics are computed at page load from data already in the local database.
+        No additional API calls are made. Changing the thresholds requires editing
+        <code>NightMetricsCalculator.cs</code>.
+    </p>
+</div>

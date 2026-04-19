@@ -152,9 +152,10 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 |---|---|---|
 | `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
 | `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with "→" detail links |
-| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Sleep stage timeline bar, intra-night HRV & HR charts, session detail row (bedtime window, efficiency, latency, restless periods, temp trend), daytime context card (steps, SpO2, stress, resilience), score contributors, LLM-ready text export (single copy) |
+| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Sleep stage timeline bar, intra-night HRV & HR charts with Oura score markers, session detail row, daytime context, score contributors, **Custom Metrics card** (Real Recovery Score, HR % thresholds, HR settling time, HRV distribution, HRV direction), LLM-ready text export |
 | `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
+| `/metrics` | `MetricsGuide.razor` | ✅ Per-metric FAQ: formula, thresholds, rationale, calibration notes |
 
 ### Pages — planned 🔲
 
@@ -207,6 +208,65 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 - **HR Settling Time:** minutes after bedtime until HR drops below 75 bpm.
 - **HRV Night Direction:** early-half vs late-half HRV average.
 - **% Night above HR threshold:** configurable threshold (default 75 bpm).
+
+---
+
+## Custom metrics
+
+All custom metrics are computed **on the fly** at page load time, from the intra-night HR and HRV timeseries already loaded for the night detail page. No additional DB queries are needed — the timeseries are already in `NightData.HeartRateSeries` and `NightData.HrvSeries`.
+
+The calculator lives in `src/OuraDashboard.Web/Services/NightMetrics.cs` and is a pure static method (no DI, no DB) — easy to unit test and easy to change thresholds.
+
+### `NightMetrics` record fields
+
+| Field | Type | What it measures |
+|---|---|---|
+| `HrAbove75Pct` | `double?` | % of 5-min HR samples above 75 bpm |
+| `HrAbove80Pct` | `double?` | % of 5-min HR samples above 80 bpm |
+| `HrSettlingMinutes` | `int?` | Minutes from session start until 3 consecutive samples ≤ 75 bpm; null = never settled |
+| `HrvBelow12Pct` | `double?` | % of HRV samples below 12 ms (poor recovery zone) |
+| `Hrv12To20Pct` | `double?` | % of HRV samples in 12–20 ms (moderate zone) |
+| `HrvAbove20Pct` | `double?` | % of HRV samples above 20 ms (good recovery zone) |
+| `HrvEarlyHalfAvg` | `double?` | Mean HRV of the first half of the night |
+| `HrvLateHalfAvg` | `double?` | Mean HRV of the second half of the night |
+| `HrvDirection` | `string` | "improving" / "declining" / "flat" / "N/A" (±2 ms dead-band) |
+| `HrvPeak` | `double?` | Highest single HRV sample |
+| `RestorativeMinutes` | `int?` | Deep + REM combined minutes |
+| `RealRecoveryScore` | `int?` | 0–100 composite (see below) |
+
+### Real Recovery Score formula
+
+Four components, normalised over what was actually available:
+
+| Component | Weight | Formula |
+|---|---|---|
+| HR below 75 bpm | 35 pts | `(1 − pctAbove75/100) × 35` |
+| Average HRV | 25 pts | `min(avgHrv / 20, 1) × 25` |
+| Restorative sleep | 25 pts | `min((deep+REM) / 150, 1) × 25` |
+| Respiratory rate | 15 pts | ≤14 brpm = 15; ≥18 brpm = 0; linear between |
+
+If a component's data is unavailable (no timeseries, no session scalar), its weight drops out
+and the score is re-normalised over available weight. This means the score is always on a 0–100
+scale regardless of data completeness, but may reflect fewer components.
+
+### Oura score markers on charts
+
+The night detail page creates **separate** `ApexChartOptions<SamplePoint>` instances for the HR and HRV charts, each pre-populated with `AnnotationsYAxis` entries:
+
+- **HRV chart**: Oura's reported average HRV (grey dashed), 20 ms zone threshold (green), 12 ms zone threshold (red).
+- **HR chart**: Oura's reported average HR (grey dashed), Oura's reported lowest HR (blue dashed), 80 bpm (red), 75 bpm (orange).
+
+This makes it visually obvious when Oura's single-number summary misrepresents the actual timeseries.
+
+### Metrics Guide page (`/metrics`)
+
+Every custom metric has a dedicated section on the `/metrics` page explaining:
+- What it measures and how it's calculated
+- Why it was added (what Oura fails to show)
+- Rough threshold guidance
+- Calibration caveats (most thresholds will need personalising after 30–60 days of data)
+
+When new metrics are added, a corresponding section **must** be added to `MetricsGuide.razor`.
 
 ---
 
@@ -283,9 +343,10 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 6. ✅ **Web: overview dashboard** — `Home.razor`, `UserCard.razor`, `DashboardQueryService`, Blazor-ApexCharts sparklines
 7. ✅ **Web: per-user detail page** — `UserDetail.razor`, 4 charts, per-night table, all scalar metrics
 8. ✅ **Web: compare page** — `Compare.razor`, overlaid charts, side-by-side per-night table
-9. 🔲 **Web: raw export page** — `/raw`, JSON download, copy-to-clipboard
-10. 🔲 **Custom metrics** — Real Recovery Score, HR Settling Time, HRV Night Direction (requires `HeartRateSample` queries)
-11. 🔲 **Deployment** — systemd unit file, full Docker Compose variant
+9. ✅ **Custom metrics (on-the-fly)** — `NightMetricsCalculator.cs`: Real Recovery Score, HR % thresholds, HR settling time, HRV distribution/direction/peak; Oura score markers on HR/HRV charts; `/metrics` guide page
+10. 🔲 **Web: raw export page** — `/raw`, JSON download, copy-to-clipboard
+11. 🔲 **Custom metrics (trend layer)** — 7-day rolling averages on user overview; autonomic state trend line
+12. 🔲 **Deployment** — systemd unit file, full Docker Compose variant
 
 ---
 

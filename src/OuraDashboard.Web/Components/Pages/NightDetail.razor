@@ -108,7 +108,7 @@ else
         <div class="card mb-4">
             <div class="card-header text-muted small">Intra-night HRV (5-min samples, ms)</div>
             <div class="card-body p-2">
-                <ApexChart TItem="SamplePoint" Options="_seriesOpts" Height="200">
+                <ApexChart TItem="SamplePoint" Options="_hrvOpts" Height="200">
                     <ApexPointSeries TItem="SamplePoint" Items="_detail.HrvSeries" Name="HRV (ms)"
                         SeriesType="SeriesType.Line"
                         XValue="p => p.Time.LocalDateTime"
@@ -124,12 +124,133 @@ else
         <div class="card mb-4">
             <div class="card-header text-muted small">Intra-night heart rate (5-min samples, bpm)</div>
             <div class="card-body p-2">
-                <ApexChart TItem="SamplePoint" Options="_seriesOpts" Height="200">
+                <ApexChart TItem="SamplePoint" Options="_hrOpts" Height="200">
                     <ApexPointSeries TItem="SamplePoint" Items="_detail.HeartRateSeries" Name="HR (bpm)"
                         SeriesType="SeriesType.Line"
                         XValue="p => p.Time.LocalDateTime"
                         YValue="p => (decimal?)p.Value" />
                 </ApexChart>
+            </div>
+        </div>
+    }
+
+    @* ── Custom Metrics ── *@
+    @if (_metrics is not null)
+    {
+        <div class="card mb-4 border-primary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold text-primary">Custom Metrics</span>
+                <a href="/metrics" class="btn btn-sm btn-outline-primary">? Guide</a>
+            </div>
+            <div class="card-body">
+
+                @* Real Recovery Score *@
+                @if (_metrics.RealRecoveryScore.HasValue)
+                {
+                    var rrs = _metrics.RealRecoveryScore.Value;
+                    var rrsColor = rrs >= 75 ? "text-success" : rrs >= 50 ? "text-warning" : "text-danger";
+                    <div class="text-center mb-4">
+                        <div class="display-4 fw-bold @rrsColor">@rrs<small class="fs-5 text-muted"> / 100</small></div>
+                        <div class="text-muted small">Real Recovery Score <a href="/metrics#rrs" class="text-muted">(?)</a></div>
+                    </div>
+                }
+
+                @* HR section *@
+                @if (_metrics.HrAbove75Pct.HasValue || _metrics.HrSettlingMinutes.HasValue)
+                {
+                    <div class="mb-2 text-muted small fw-semibold text-uppercase">Cardiovascular</div>
+                    <div class="row text-center g-2 mb-4">
+                        @if (_metrics.HrAbove75Pct.HasValue)
+                        {
+                            var p75Color = _metrics.HrAbove75Pct.Value > 50 ? "text-danger" : _metrics.HrAbove75Pct.Value > 20 ? "text-warning" : "text-success";
+                            <div class="col">
+                                <div class="fs-4 fw-bold @p75Color">@_metrics.HrAbove75Pct.Value.ToString("F1")%</div>
+                                <div class="text-muted small">HR above 75 bpm <a href="/metrics#hr75" class="text-muted">(?)</a></div>
+                            </div>
+                        }
+                        @if (_metrics.HrAbove80Pct.HasValue)
+                        {
+                            var p80Color = _metrics.HrAbove80Pct.Value > 30 ? "text-danger" : _metrics.HrAbove80Pct.Value > 10 ? "text-warning" : "text-success";
+                            <div class="col">
+                                <div class="fs-4 fw-bold @p80Color">@_metrics.HrAbove80Pct.Value.ToString("F1")%</div>
+                                <div class="text-muted small">HR above 80 bpm <a href="/metrics#hr80" class="text-muted">(?)</a></div>
+                            </div>
+                        }
+                        @if (_metrics.HrSettlingMinutes.HasValue)
+                        {
+                            var settleColor = _metrics.HrSettlingMinutes.Value > 60 ? "text-danger" : _metrics.HrSettlingMinutes.Value > 30 ? "text-warning" : "text-success";
+                            <div class="col">
+                                <div class="fs-4 fw-bold @settleColor">@_metrics.HrSettlingMinutes.Value min</div>
+                                <div class="text-muted small">HR settling time <a href="/metrics#settling" class="text-muted">(?)</a></div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col">
+                                <div class="fs-4 fw-bold text-danger">Never</div>
+                                <div class="text-muted small">HR settling (HR never below 75) <a href="/metrics#settling" class="text-muted">(?)</a></div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* HRV distribution *@
+                @if (_metrics.HrvBelow12Pct.HasValue)
+                {
+                    <div class="mb-2 text-muted small fw-semibold text-uppercase">HRV</div>
+                    <div class="row text-center g-2 mb-3">
+                        <div class="col">
+                            <div class="fs-4 fw-bold text-danger">@_metrics.HrvBelow12Pct.Value.ToString("F1")%</div>
+                            <div class="text-muted small">below 12 ms <a href="/metrics#hrv-dist" class="text-muted">(?)</a></div>
+                        </div>
+                        <div class="col">
+                            <div class="fs-4 fw-bold text-warning">@_metrics.Hrv12To20Pct?.ToString("F1")%</div>
+                            <div class="text-muted small">12–20 ms</div>
+                        </div>
+                        <div class="col">
+                            <div class="fs-4 fw-bold text-success">@_metrics.HrvAbove20Pct?.ToString("F1")%</div>
+                            <div class="text-muted small">above 20 ms</div>
+                        </div>
+                        @if (_metrics.HrvPeak.HasValue)
+                        {
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@_metrics.HrvPeak.Value.ToString("F0") ms</div>
+                                <div class="text-muted small">HRV peak <a href="/metrics#hrv-peak" class="text-muted">(?)</a></div>
+                            </div>
+                        }
+                    </div>
+                    @if (_metrics.HrvEarlyHalfAvg.HasValue && _metrics.HrvLateHalfAvg.HasValue)
+                    {
+                        var dirColor = _metrics.HrvDirection == "improving" ? "text-success" : _metrics.HrvDirection == "declining" ? "text-danger" : "text-muted";
+                        var dirSymbol = _metrics.HrvDirection == "improving" ? "↑" : _metrics.HrvDirection == "declining" ? "↓" : "→";
+                        <div class="row text-center g-2 mb-4">
+                            <div class="col">
+                                <div class="fs-5 fw-bold">@_metrics.HrvEarlyHalfAvg.Value.ToString("F1") ms</div>
+                                <div class="text-muted small">HRV early-night avg</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-5 fw-bold">@_metrics.HrvLateHalfAvg.Value.ToString("F1") ms</div>
+                                <div class="text-muted small">HRV late-night avg</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-5 fw-bold @dirColor">@dirSymbol @_metrics.HrvDirection</div>
+                                <div class="text-muted small">HRV direction <a href="/metrics#hrv-dir" class="text-muted">(?)</a></div>
+                            </div>
+                        </div>
+                    }
+                }
+
+                @* Restorative sleep *@
+                @if (_metrics.RestorativeMinutes.HasValue)
+                {
+                    var restColor = _metrics.RestorativeMinutes.Value >= 150 ? "text-success" : _metrics.RestorativeMinutes.Value >= 90 ? "text-warning" : "text-danger";
+                    <div class="row text-center g-2">
+                        <div class="col">
+                            <div class="fs-4 fw-bold @restColor">@FmtMin(_metrics.RestorativeMinutes)</div>
+                            <div class="text-muted small">Restorative sleep (Deep + REM) <a href="/metrics#restorative" class="text-muted">(?)</a></div>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     }
@@ -216,7 +337,9 @@ else
     private DateOnly? _prevDay;
     private DateOnly? _nextDay;
     private string _llmText = string.Empty;
-    private ApexChartOptions<SamplePoint> _seriesOpts = null!;
+    private NightMetrics? _metrics;
+    private ApexChartOptions<SamplePoint> _hrvOpts = null!;
+    private ApexChartOptions<SamplePoint> _hrOpts  = null!;
     private ElementReference _textareaRef;
 
     protected override async Task OnParametersSetAsync()
@@ -236,20 +359,79 @@ else
         _nextDay = idx > 0             ? nights[idx - 1] : (DateOnly?)null; // list is DESC
         _prevDay = idx < nights.Count - 1 ? nights[idx + 1] : (DateOnly?)null;
 
-        _seriesOpts = new ApexChartOptions<SamplePoint>
+        // Base options shared by both timeseries charts
+        static ApexChartOptions<SamplePoint> BaseOpts() => new()
         {
-            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
-            Stroke = new Stroke { Curve = Curve.Smooth, Width = [1] },
+            Chart   = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+            Stroke  = new Stroke { Curve = Curve.Smooth, Width = [1] },
             Markers = new Markers { Size = [0] },
-            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+            Grid    = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
             Tooltip = new Tooltip { X = new TooltipX { Format = "HH:mm" } },
-            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "HH:mm" } },
-            Yaxis = [new YAxis { Labels = new YAxisLabels { MinWidth = 30 } }],
-            Legend = new Legend { Show = false },
+            Xaxis   = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "HH:mm" } },
+            Yaxis   = [new YAxis { Labels = new YAxisLabels { MinWidth = 30 } }],
+            Legend  = new Legend { Show = false },
         };
 
+        // HRV chart — annotate Oura's average HRV and the 12 / 20 ms zone thresholds
+        _hrvOpts = BaseOpts();
+        _hrvOpts.Annotations = new Annotations { Yaxis = [] };
+        if (_detail?.AverageHrv is int avgHrv)
+            _hrvOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+            {
+                Y           = avgHrv,
+                BorderColor = "#636e72",
+                BorderWidth = 2,
+                Label       = new Label { Text = $"Oura avg ({avgHrv} ms)",
+                              Style = new Style { Background = "#636e72", Color = "#fff", FontSize = "11px" } },
+            });
+        _hrvOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+        {
+            Y = 20, BorderColor = "#00b894", BorderWidth = 1, StrokeDashArray = 4,
+            Label = new Label { Text = "20 ms", Style = new Style { Background = "#00b894", Color = "#fff", FontSize = "10px" } },
+        });
+        _hrvOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+        {
+            Y = 12, BorderColor = "#e17055", BorderWidth = 1, StrokeDashArray = 4,
+            Label = new Label { Text = "12 ms", Style = new Style { Background = "#e17055", Color = "#fff", FontSize = "10px" } },
+        });
+
+        // HR chart — annotate Oura's avg & lowest HR plus the 75 / 80 bpm thresholds
+        _hrOpts = BaseOpts();
+        _hrOpts.Annotations = new Annotations { Yaxis = [] };
+        if (_detail?.AverageHeartRate is double avgHr)
+            _hrOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+            {
+                Y           = (decimal)avgHr,
+                BorderColor = "#636e72",
+                BorderWidth = 2,
+                Label       = new Label { Text = $"Oura avg ({avgHr:F1} bpm)",
+                              Style = new Style { Background = "#636e72", Color = "#fff", FontSize = "11px" } },
+            });
+        if (_detail?.LowestHeartRate is int lowestHr)
+            _hrOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+            {
+                Y           = lowestHr,
+                BorderColor = "#0984e3",
+                BorderWidth = 2,
+                Label       = new Label { Text = $"Oura lowest ({lowestHr} bpm)",
+                              Style = new Style { Background = "#0984e3", Color = "#fff", FontSize = "11px" } },
+            });
+        _hrOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+        {
+            Y = 80, BorderColor = "#e17055", BorderWidth = 1, StrokeDashArray = 4,
+            Label = new Label { Text = "80 bpm", Style = new Style { Background = "#e17055", Color = "#fff", FontSize = "10px" } },
+        });
+        _hrOpts.Annotations.Yaxis.Add(new AnnotationsYAxis
+        {
+            Y = 75, BorderColor = "#fdcb6e", BorderWidth = 1, StrokeDashArray = 4,
+            Label = new Label { Text = "75 bpm", Style = new Style { Background = "#fdcb6e", Color = "#000", FontSize = "10px" } },
+        });
+
         if (_detail is not null)
-            _llmText = BuildLlmText(_detail);
+        {
+            _metrics = NightMetricsCalculator.Compute(_detail);
+            _llmText  = BuildLlmText(_detail);
+        }
 
         _loading = false;
     }
