@@ -17,6 +17,12 @@ public record NightMetrics(
     /// Null means HR never settled.
     /// </summary>
     int? HrSettlingMinutes,
+    /// <summary>Mean HR of the first half of the sleep session (bpm).</summary>
+    double? HrEarlyHalfAvg,
+    /// <summary>Mean HR of the second half of the sleep session (bpm).</summary>
+    double? HrLateHalfAvg,
+    /// <summary>"settled" | "elevated" | "calm" | "variable" — overall level + early-vs-late delta.</summary>
+    string HrShape,
 
     // ── HRV ─────────────────────────────────────────────────────────────────
     /// <summary>% of HRV samples below 12 ms (poor autonomic recovery zone).</summary>
@@ -37,6 +43,8 @@ public record NightMetrics(
     // ── Summary ──────────────────────────────────────────────────────────────
     /// <summary>Deep + REM combined in minutes.</summary>
     int? RestorativeMinutes,
+    /// <summary>Awake minutes as % of time in bed. Highlights what efficiency scores hide.</summary>
+    double? AwakePctOfBed,
     /// <summary>
     /// Real Recovery Score (0–100). Composite of HR below-75 proportion (35 pts),
     /// average HRV (25 pts, ceiling 20 ms), restorative sleep (25 pts, target 150 min),
@@ -61,6 +69,9 @@ public static class NightMetricsCalculator
         double? hrAbove75Pct   = null;
         double? hrAbove80Pct   = null;
         int?    hrSettlingMins = null;
+        double? hrEarlyHalfAvg = null;
+        double? hrLateHalfAvg  = null;
+        string  hrShape        = "N/A";
 
         if (hrSamples.Count > 0)
         {
@@ -83,6 +94,24 @@ public static class NightMetricsCalculator
                     hrSettlingMins = (int)(hrSamples[i].Time - origin).TotalMinutes;
                     break;
                 }
+            }
+
+            // HR curve shape: first-half vs second-half averages
+            int hrMidIdx    = hrSamples.Count / 2;
+            var hrVals      = hrSamples.Select(p => p.Value!.Value).ToList();
+            var hrEarlyHalf = hrVals.Take(hrMidIdx).ToList();
+            var hrLateHalf  = hrVals.Skip(hrMidIdx).ToList();
+            if (hrEarlyHalf.Count > 0) hrEarlyHalfAvg = hrEarlyHalf.Average();
+            if (hrLateHalf.Count  > 0) hrLateHalfAvg  = hrLateHalf.Average();
+
+            if (hrEarlyHalfAvg.HasValue && hrLateHalfAvg.HasValue)
+            {
+                double overallHr = hrVals.Average();
+                double hrDelta   = hrLateHalfAvg.Value - hrEarlyHalfAvg.Value;
+                // "settled": was high, came down. "elevated": stayed high. "calm": stayed low. "variable": rose later.
+                hrShape = overallHr > 75
+                    ? (hrDelta < -3 ? "settled" : "elevated")
+                    : (hrDelta >  3 ? "variable" : "calm");
             }
         }
 
@@ -122,6 +151,10 @@ public static class NightMetricsCalculator
         int? restorativeMin = (d.DeepMinutes.HasValue && d.RemMinutes.HasValue)
             ? d.DeepMinutes.Value + d.RemMinutes.Value
             : (int?)null;
+
+        double? awakePctOfBed = (d.AwakeMinutes.HasValue && d.TimeInBedMinutes.HasValue && d.TimeInBedMinutes.Value > 0)
+            ? Math.Round(d.AwakeMinutes.Value * 100.0 / d.TimeInBedMinutes.Value, 1)
+            : null;
 
         // ── Real Recovery Score (0–100) ──────────────────────────────────────
         // Each component contributes a weighted sub-score.
@@ -170,6 +203,9 @@ public static class NightMetricsCalculator
             HrAbove75Pct:      hrAbove75Pct  is double ha75 ? Math.Round(ha75,  1) : null,
             HrAbove80Pct:      hrAbove80Pct  is double ha80 ? Math.Round(ha80,  1) : null,
             HrSettlingMinutes: hrSettlingMins,
+            HrEarlyHalfAvg:   hrEarlyHalfAvg is double heh ? Math.Round(heh, 1) : null,
+            HrLateHalfAvg:    hrLateHalfAvg  is double hlh ? Math.Round(hlh, 1) : null,
+            HrShape:          hrShape,
             HrvBelow12Pct:     hrvBelow12Pct is double hb12 ? Math.Round(hb12,  1) : null,
             Hrv12To20Pct:      hrv12To20Pct  is double hm   ? Math.Round(hm,    1) : null,
             HrvAbove20Pct:     hrvAbove20Pct is double ha20 ? Math.Round(ha20,  1) : null,
@@ -178,6 +214,7 @@ public static class NightMetricsCalculator
             HrvDirection:      hrvDirection,
             HrvPeak:           hrvPeak       is double hp   ? Math.Round(hp,    1) : null,
             RestorativeMinutes: restorativeMin,
+            AwakePctOfBed:     awakePctOfBed,
             RealRecoveryScore:  realRecovery
         );
     }

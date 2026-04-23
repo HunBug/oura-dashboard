@@ -233,6 +233,178 @@
         </div>
     </div>
 
+    @* ── Oura's lowest HR ── *@
+    <div class="card mb-4" id="oura-lowest-hr">
+        <div class="card-header"><strong>Oura's Lowest HR — why it can mislead</strong></div>
+        <div class="card-body">
+            <p>
+                Oura highlights the single lowest HR reading of the night — often a narrow window
+                where the heart briefly dipped. The ring prominently features this number as if it
+                characterises the whole night.
+            </p>
+            <p>
+                The problem: a 10-minute dip to 56&nbsp;bpm can coexist with HR spending 70% of the
+                night above 75&nbsp;bpm. The dip happened; it just wasn't representative.
+                A 70&nbsp;bpm lowest HR on a calm night may be healthier than a 55&nbsp;bpm dip on a
+                night of sustained elevated HR.
+            </p>
+            <p>
+                <strong>Use it alongside:</strong> the "HR above 75%" and "HR above 80%" distribution
+                metrics and the HR curve chart to see the full story.
+            </p>
+        </div>
+    </div>
+
+    @* ── Oura's average HR ── *@
+    <div class="card mb-4" id="oura-hr-avg">
+        <div class="card-header"><strong>Oura's Average HR — what the average conceals</strong></div>
+        <div class="card-body">
+            <p>
+                Oura's average HR is the mean of the intra-session samples. It's a real measurement,
+                but a single number hides the distribution beneath it.
+            </p>
+            <p>
+                A 67&nbsp;bpm average could mean:
+                <ul>
+                    <li><strong>Good:</strong> HR stayed near 67 all night — consistent low-gear recovery.</li>
+                    <li><strong>Concerning:</strong> HR spent the first half at 85&nbsp;bpm and the second half at 49&nbsp;bpm. The average looks fine; the night wasn't.</li>
+                </ul>
+            </p>
+            <p>
+                The HR distribution percentages ("HR above 75%", "HR above 80%") and the HR curve
+                chart complement the average to reveal which scenario actually occurred.
+            </p>
+        </div>
+    </div>
+
+    @* ── Oura's average HRV ── *@
+    <div class="card mb-4" id="oura-hrv-avg">
+        <div class="card-header"><strong>Oura's Average HRV — same trap as HR average</strong></div>
+        <div class="card-body">
+            <p>
+                Oura's HRV average is the mean of 5-minute HRV samples across the session.
+                The same averaging problem applies: a night where HRV alternates chaotically between
+                5&nbsp;ms and 45&nbsp;ms produces a ~25&nbsp;ms average that looks decent in isolation.
+            </p>
+            <p>
+                The HRV distribution buckets (below 12&nbsp;ms / 12–20&nbsp;ms / above 20&nbsp;ms)
+                and the HRV trend direction (improving / declining / flat) reveal what the average hides.
+                A high average with a "declining" trend is a different picture from a lower average with
+                a steady "improving" trend late in the night.
+            </p>
+        </div>
+    </div>
+
+    @* ── Awake time ── *@
+    <div class="card mb-4" id="awake-time">
+        <div class="card-header"><strong>Awake time — raw minutes vs efficiency percentage</strong></div>
+        <div class="card-body">
+            <p>
+                Oura reports "awake minutes" and "sleep efficiency" (sleep / time-in-bed × 100%).
+                Both are real numbers, but they are not equally informative on their own.
+            </p>
+            <p>
+                <strong>Why we show awake % of time in bed:</strong> A 90% efficiency on 5 hours in bed
+                means 27 minutes awake. A 90% efficiency on 9 hours in bed means 54 minutes awake.
+                Same percentage, very different experience. The raw awake percentage normalises out
+                the duration difference and makes nights genuinely comparable.
+            </p>
+            <ul>
+                <li><strong>&lt; 10%</strong> — good (awake time is minor)</li>
+                <li><strong>10–20%</strong> — moderate (worth monitoring)</li>
+                <li><strong>&gt; 20%</strong> — high (substantial fragmentation)</li>
+            </ul>
+            <p>The raw awake count in minutes remains on the stats row for reference.</p>
+        </div>
+    </div>
+
+    @* ── Temperature deviation ── *@
+    <div class="card mb-4" id="temp-dev">
+        <div class="card-header"><strong>Temperature Deviation — single night vs multi-night trend</strong></div>
+        <div class="card-body">
+            <p>
+                Oura reports today's skin temperature deviation from your personal baseline (°C).
+                There are two separate signals here that are easy to conflate:
+            </p>
+            <ul>
+                <li><strong>Deviation</strong> — how far today's reading is from baseline. A single +0.8°C isn't alarming; many people see natural variation in this range.</li>
+                <li><strong>Trend</strong> — the direction and rate of change over the past 3–7 days. A sustained upward trend over several days often precedes illness onset, heavy training fatigue, or (for Maa) the start of the luteal phase — even before any single day's number looks alarming.</li>
+            </ul>
+            <p>
+                A sharp negative deviation followed by sustained elevation can also help pinpoint
+                ovulation timing. The deviation shown here is the raw Oura number;
+                trend interpretation requires looking at multiple nights in the Compare view.
+            </p>
+        </div>
+    </div>
+
+    @* ── Respiratory rate ── *@
+    <div class="card mb-4" id="resp-rate">
+        <div class="card-header"><strong>Respiratory Rate — slow-moving baseline, high signal value</strong></div>
+        <div class="card-body">
+            <p>
+                Nocturnal breathing rate (breaths per minute, brpm). This metric changes slowly —
+                days to weeks — which is exactly what makes it diagnostically useful. It's a stable
+                baseline that only shifts when something systemic is happening.
+            </p>
+            <ul>
+                <li>A sustained increase of +1&nbsp;brpm or more can precede illness symptoms by 1–3 days.</li>
+                <li>Tracking the slow downward trend over months reveals cardiovascular fitness improvements (lower resting drive to breathe).</li>
+                <li>Short-term spikes (a single outlier night) are usually noise — look for 3+ consecutive nights of elevation.</li>
+            </ul>
+            <p>
+                The Real Recovery Score penalises respiratory rates above 14&nbsp;brpm (scaled to 0 at 18&nbsp;brpm),
+                which reflects the typical target range for a well-recovered adult.
+            </p>
+        </div>
+    </div>
+
+    @* ── Sleep efficiency ── *@
+    <div class="card mb-4" id="efficiency">
+        <div class="card-header"><strong>Sleep Efficiency — what the percentage hides</strong></div>
+        <div class="card-body">
+            <p>
+                Sleep efficiency = total sleep time ÷ time in bed × 100%.
+                Oura classifies light, deep, REM, and awake periods to compute both sides of this fraction.
+            </p>
+            <p>
+                <strong>Limitations:</strong>
+            </p>
+            <ul>
+                <li>A 90% efficiency on 5 hours = 4h30m actual sleep. A 90% on 9 hours = 8h6m. Same number, vastly different outcomes.</li>
+                <li>Oura's staging isn't perfect — brief restless periods may be called "light sleep" instead of "awake", slightly inflating efficiency.</li>
+                <li>Chasing 100% efficiency is not always a good sign (it can mean insufficient time in bed or an inability to stay awake).</li>
+            </ul>
+            <p>
+                The "Awake % of time in bed" custom metric (above) complements efficiency by making the
+                duration-independent fraction visible.
+            </p>
+        </div>
+    </div>
+
+    @* ── HR curve shape ── *@
+    <div class="card mb-4" id="hr-shape">
+        <div class="card-header"><strong>HR Curve Shape — how heart rate moved across the night</strong></div>
+        <div class="card-body">
+            <p>
+                A classification based on two things: <em>where</em> average HR sat overall (above or below 75&nbsp;bpm)
+                and <em>how</em> it changed between the first and second halves of the night (±3&nbsp;bpm threshold).
+            </p>
+            <table class="table table-sm mt-2">
+                <thead><tr><th>Label</th><th>Icon</th><th>Meaning</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>settled ↓</strong></td><td>text-success</td><td>HR started elevated (&gt;75) but came down by more than 3&nbsp;bpm on average. The body found its rest — better than "elevated" but still shows an initial sympathetic phase.</td></tr>
+                    <tr><td><strong>elevated ─</strong></td><td>text-danger</td><td>HR stayed above 75&nbsp;bpm throughout both halves. Sustained sympathetic activation; full recovery is unlikely.</td></tr>
+                    <tr><td><strong>calm ─</strong></td><td>text-success</td><td>HR remained below 75&nbsp;bpm all night with no significant late-night rise. The cleanest recovery pattern.</td></tr>
+                    <tr><td><strong>variable ↑</strong></td><td>text-warning</td><td>HR was lower in the first half and rose in the second — fragmented sleep, early-morning arousal, or a secondary stress response after initial settling.</td></tr>
+                </tbody>
+            </table>
+            <p class="text-muted small mt-2">
+                Formula: overallAvg &gt; 75 → (lateMinus;earlyDelta &lt; −3 ? "settled" : "elevated") | overallAvg ≤ 75 → (delta &gt; 3 ? "variable" : "calm")
+            </p>
+        </div>
+    </div>
+
     @* ── Oura markers on charts ── *@
     <div class="card mb-4" id="oura-markers">
         <div class="card-header fw-semibold">Oura Score Markers on Charts</div>

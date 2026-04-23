@@ -46,14 +46,14 @@ else
     <div class="row text-center mb-4 g-2">
         <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.SleepScore)</div><div class="text-muted small">Sleep score</div></div>
         <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.ReadinessScore)</div><div class="text-muted small">Readiness</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AverageHrv)</div><div class="text-muted small">HRV avg (ms)</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageHeartRate)</div><div class="text-muted small">Avg HR (bpm)</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.LowestHeartRate)</div><div class="text-muted small">Lowest HR</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageBreath)</div><div class="text-muted small">Resp (brpm)</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.DeepMinutes)</div><div class="text-muted small">Deep (min)</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.RemMinutes)</div><div class="text-muted small">REM (min)</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AwakeMinutes)</div><div class="text-muted small">Awake (min)</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@FmtTemp(_detail.TempDeviation)</div><div class="text-muted small">Temp dev</div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AverageHrv)</div><div class="text-muted small">HRV avg (ms) <a href="/metrics#oura-hrv-avg" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Average conceals distribution — same avg can hide flat calm vs chaotic 5/45 ms swings">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageHeartRate)</div><div class="text-muted small">Avg HR (bpm) <a href="/metrics#oura-hr-avg" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Average conceals distribution — 67 avg could mean flat-67 or 85 first half / 49 second half">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.LowestHeartRate)</div><div class="text-muted small">Lowest HR <a href="/metrics#oura-lowest-hr" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="A brief dip to 56 bpm can coexist with 70% of the night above 75 bpm — not representative on its own">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageBreath)</div><div class="text-muted small">Resp (brpm) <a href="/metrics#resp-rate" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Changes slowly over days. Sustained +1 brpm can precede illness by 1–3 days">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.DeepMinutes)</div><div class="text-muted small">Deep (min) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM = restorative sleep. Both stages count toward the 150-min target">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.RemMinutes)</div><div class="text-muted small">REM (min) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM = restorative sleep. Both stages count toward the 150-min target">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AwakeMinutes)</div><div class="text-muted small">Awake (min) <a href="/metrics#awake-time" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Raw count. See the custom metrics card below for awake % of time in bed, which is duration-independent">(?)</a></div></div>
+        <div class="col"><div class="fs-3 fw-bold">@FmtTemp(_detail.TempDeviation)</div><div class="text-muted small">Temp dev <a href="/metrics#temp-dev" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Single-night deviation from your baseline. Multi-day trend direction is more predictive of illness or cycle phase">(?)</a></div></div>
     </div>
 
     @* ── Session details row ── *@
@@ -68,7 +68,7 @@ else
         <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TotalSleepMinutes)</div><div class="text-muted small">Total sleep</div></div>
         <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LightSleepMinutes)</div><div class="text-muted small">Light (min)</div></div>
         <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TimeInBedMinutes)</div><div class="text-muted small">Time in bed</div></div>
-        <div class="col"><div class="fs-5 fw-bold">@(_detail.Efficiency.HasValue ? _detail.Efficiency + "%" : "—")</div><div class="text-muted small">Efficiency</div></div>
+        <div class="col"><div class="fs-5 fw-bold">@(_detail.Efficiency.HasValue ? _detail.Efficiency + "%" : "—")</div><div class="text-muted small">Efficiency <a href="/metrics#efficiency" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Sleep ÷ time-in-bed × 100%. 90% on 5h vs 9h is very different — the percentage hides the duration">(?)</a></div></div>
         <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LatencyMinutes)</div><div class="text-muted small">Sleep latency</div></div>
         <div class="col"><div class="fs-5 fw-bold">@(_detail.RestlessPeriods?.ToString() ?? "—")</div><div class="text-muted small">Restless periods</div></div>
         @if (_detail.TempTrendDeviation.HasValue)
@@ -151,7 +151,7 @@ else
                     var rrsColor = rrs >= 75 ? "text-success" : rrs >= 50 ? "text-warning" : "text-danger";
                     <div class="text-center mb-4">
                         <div class="display-4 fw-bold @rrsColor">@rrs<small class="fs-5 text-muted"> / 100</small></div>
-                        <div class="text-muted small">Real Recovery Score <a href="/metrics#rrs" class="text-muted">(?)</a></div>
+                        <div class="text-muted small">Real Recovery Score <a href="/metrics#rrs" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Composite: HR below 75 bpm (35 pts) + HRV avg (25 pts) + restorative sleep (25 pts) + resp rate (15 pts)">(?)</a></div>
                     </div>
                 }
 
@@ -165,7 +165,7 @@ else
                             var p75Color = _metrics.HrAbove75Pct.Value > 50 ? "text-danger" : _metrics.HrAbove75Pct.Value > 20 ? "text-warning" : "text-success";
                             <div class="col">
                                 <div class="fs-4 fw-bold @p75Color">@_metrics.HrAbove75Pct.Value.ToString("F1")%</div>
-                                <div class="text-muted small">HR above 75 bpm <a href="/metrics#hr75" class="text-muted">(?)</a></div>
+                                <div class="text-muted small">HR above 75 bpm <a href="/metrics#hr75" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="% of the night HR exceeded 75 bpm — sustained sympathetic activation; the core cardiovascular recovery indicator">(?)</a></div>
                             </div>
                         }
                         @if (_metrics.HrAbove80Pct.HasValue)
@@ -173,7 +173,7 @@ else
                             var p80Color = _metrics.HrAbove80Pct.Value > 30 ? "text-danger" : _metrics.HrAbove80Pct.Value > 10 ? "text-warning" : "text-success";
                             <div class="col">
                                 <div class="fs-4 fw-bold @p80Color">@_metrics.HrAbove80Pct.Value.ToString("F1")%</div>
-                                <div class="text-muted small">HR above 80 bpm <a href="/metrics#hr80" class="text-muted">(?)</a></div>
+                                <div class="text-muted small">HR above 80 bpm <a href="/metrics#hr80" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Stricter threshold: truly elevated HR. &gt;20% here is a clear concern">(?)</a></div>
                             </div>
                         }
                         @if (_metrics.HrSettlingMinutes.HasValue)
@@ -181,17 +181,46 @@ else
                             var settleColor = _metrics.HrSettlingMinutes.Value > 60 ? "text-danger" : _metrics.HrSettlingMinutes.Value > 30 ? "text-warning" : "text-success";
                             <div class="col">
                                 <div class="fs-4 fw-bold @settleColor">@_metrics.HrSettlingMinutes.Value min</div>
-                                <div class="text-muted small">HR settling time <a href="/metrics#settling" class="text-muted">(?)</a></div>
+                                <div class="text-muted small">HR settling time <a href="/metrics#settling" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Minutes from bedtime until HR first holds below 75 bpm: 3 consecutive 5-min samples all ≤75">(?)</a></div>
                             </div>
                         }
                         else
                         {
                             <div class="col">
                                 <div class="fs-4 fw-bold text-danger">Never</div>
-                                <div class="text-muted small">HR settling (HR never below 75) <a href="/metrics#settling" class="text-muted">(?)</a></div>
+                                <div class="text-muted small">HR settling (HR never below 75) <a href="/metrics#settling" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="HR never held below 75 bpm for 3+ consecutive 5-min samples all night">(?)</a></div>
                             </div>
                         }
                     </div>
+
+                    @* HR half-night comparison and curve shape *@
+                    @if (_metrics.HrEarlyHalfAvg.HasValue && _metrics.HrLateHalfAvg.HasValue)
+                    {
+                        var hrShapeColor = (_metrics.HrShape == "settled" || _metrics.HrShape == "calm") ? "text-success"
+                            : _metrics.HrShape == "elevated" ? "text-danger" : "text-warning";
+                        var hrShapeSymbol = _metrics.HrShape switch
+                        {
+                            "settled"  => "↓",
+                            "calm"     => "─",
+                            "elevated" => "─",
+                            "variable" => "↑",
+                            _          => ""
+                        };
+                        <div class="row text-center g-2 mb-2">
+                            <div class="col">
+                                <div class="fs-5 fw-bold">@_metrics.HrEarlyHalfAvg.Value.ToString("F1") bpm</div>
+                                <div class="text-muted small">HR early-night avg</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-5 fw-bold">@_metrics.HrLateHalfAvg.Value.ToString("F1") bpm</div>
+                                <div class="text-muted small">HR late-night avg</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-5 fw-bold @hrShapeColor">@hrShapeSymbol @_metrics.HrShape</div>
+                                <div class="text-muted small">HR curve shape <a href="/metrics#hr-shape" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="settled↓ = was high, came down | elevated─ = stayed high | calm─ = low all night | variable↑ = rose late">(?)</a></div>
+                            </div>
+                        </div>
+                    }
                 }
 
                 @* HRV distribution *@
@@ -201,7 +230,7 @@ else
                     <div class="row text-center g-2 mb-3">
                         <div class="col">
                             <div class="fs-4 fw-bold text-danger">@_metrics.HrvBelow12Pct.Value.ToString("F1")%</div>
-                            <div class="text-muted small">below 12 ms <a href="/metrics#hrv-dist" class="text-muted">(?)</a></div>
+                            <div class="text-muted small">below 12 ms <a href="/metrics#hrv-dist" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="HRV zones: &lt;12 ms = poor recovery, 12–20 ms = moderate, &gt;20 ms = good. This shows the full distribution">(?)</a></div>
                         </div>
                         <div class="col">
                             <div class="fs-4 fw-bold text-warning">@_metrics.Hrv12To20Pct?.ToString("F1")%</div>
@@ -215,7 +244,7 @@ else
                         {
                             <div class="col">
                                 <div class="fs-4 fw-bold">@_metrics.HrvPeak.Value.ToString("F0") ms</div>
-                                <div class="text-muted small">HRV peak <a href="/metrics#hrv-peak" class="text-muted">(?)</a></div>
+                                <div class="text-muted small">HRV peak <a href="/metrics#hrv-peak" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Highest single HRV sample of the night — shows max parasympathetic capacity reached">(?)</a></div>
                             </div>
                         }
                     </div>
@@ -234,7 +263,7 @@ else
                             </div>
                             <div class="col">
                                 <div class="fs-5 fw-bold @dirColor">@dirSymbol @_metrics.HrvDirection</div>
-                                <div class="text-muted small">HRV direction <a href="/metrics#hrv-dir" class="text-muted">(?)</a></div>
+                                <div class="text-muted small">HRV direction <a href="/metrics#hrv-dir" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Trend across the night: improving = late &gt; early by &gt;2 ms. A good night has HRV rising as sleep deepens">(?)</a></div>
                             </div>
                         </div>
                     }
@@ -244,10 +273,23 @@ else
                 @if (_metrics.RestorativeMinutes.HasValue)
                 {
                     var restColor = _metrics.RestorativeMinutes.Value >= 150 ? "text-success" : _metrics.RestorativeMinutes.Value >= 90 ? "text-warning" : "text-danger";
-                    <div class="row text-center g-2">
+                    <div class="row text-center g-2 mb-3">
                         <div class="col">
                             <div class="fs-4 fw-bold @restColor">@FmtMin(_metrics.RestorativeMinutes)</div>
-                            <div class="text-muted small">Restorative sleep (Deep + REM) <a href="/metrics#restorative" class="text-muted">(?)</a></div>
+                            <div class="text-muted small">Restorative sleep (Deep + REM) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM combined. Target: ≥150 min = good, ≥90 min = moderate, &lt;90 min = poor">(?)</a></div>
+                        </div>
+                    </div>
+                }
+
+                @* Awake quality *@
+                @if (_metrics.AwakePctOfBed.HasValue)
+                {
+                    var awakePctColor = _metrics.AwakePctOfBed.Value > 20 ? "text-danger" : _metrics.AwakePctOfBed.Value > 10 ? "text-warning" : "text-success";
+                    <div class="mb-2 text-muted small fw-semibold text-uppercase mt-2">Sleep Quality</div>
+                    <div class="row text-center g-2">
+                        <div class="col">
+                            <div class="fs-4 fw-bold @awakePctColor">@_metrics.AwakePctOfBed.Value.ToString("F1")%</div>
+                            <div class="text-muted small">Awake % of time in bed <a href="/metrics#awake-time" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Duration-independent: &lt;10% = good, 10–20% = moderate, &gt;20% = high fragmentation. More honest than efficiency %">(?)</a></div>
                         </div>
                     </div>
                 }
@@ -434,6 +476,12 @@ else
         }
 
         _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_loading)
+            await JS.InvokeVoidAsync("initTooltips");
     }
 
     private async Task CopyToClipboard()

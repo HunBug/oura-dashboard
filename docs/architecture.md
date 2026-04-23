@@ -201,14 +201,6 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 - `TemperatureDeviation` in `DailyReadiness` **is** populated from the readiness endpoint.
 - ApexCharts JS **mutates the options object** in-place during chart initialization. Each chart on a page must have its own separate `ApexChartOptions<T>` instance — sharing one object causes all charts after the first to render blank or with wrong axis bounds.
 
-### Custom metrics — planned 🔲
-
-- **Real Recovery Score (0–100):** `% night HR < 75` (weighted) + `HRV avg > 15 ms` (binary) + `restorative sleep > 150 min` + `resp rate` (inverted). Requires `HeartRateSample` queries.
-- **Autonomic State Trend:** 7-day rolling average of nocturnal HR, HRV avg, resp rate.
-- **HR Settling Time:** minutes after bedtime until HR drops below 75 bpm.
-- **HRV Night Direction:** early-half vs late-half HRV average.
-- **% Night above HR threshold:** configurable threshold (default 75 bpm).
-
 ---
 
 ## Custom metrics
