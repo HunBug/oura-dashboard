@@ -111,7 +111,7 @@ else
                 <ApexChart TItem="SamplePoint" Options="_hrvOpts" Height="200">
                     <ApexPointSeries TItem="SamplePoint" Items="_detail.HrvSeries" Name="HRV (ms)"
                         SeriesType="SeriesType.Line"
-                        XValue="p => p.Time.LocalDateTime"
+                        XValue="p => DateTime.SpecifyKind(p.Time.LocalDateTime, DateTimeKind.Utc)"
                         YValue="p => (decimal?)p.Value" />
                 </ApexChart>
             </div>
@@ -127,7 +127,7 @@ else
                 <ApexChart TItem="SamplePoint" Options="_hrOpts" Height="200">
                     <ApexPointSeries TItem="SamplePoint" Items="_detail.HeartRateSeries" Name="HR (bpm)"
                         SeriesType="SeriesType.Line"
-                        XValue="p => p.Time.LocalDateTime"
+                        XValue="p => DateTime.SpecifyKind(p.Time.LocalDateTime, DateTimeKind.Utc)"
                         YValue="p => (decimal?)p.Value" />
                 </ApexChart>
             </div>
@@ -469,6 +469,36 @@ else
             Label = new Label { Text = "75 bpm", Style = new Style { Background = "#fdcb6e", Color = "#000", FontSize = "10px" } },
         });
 
+        // X-axis range and bedtime annotations (for both charts)
+        if (_detail?.BedtimeStart.HasValue == true && _detail.BedtimeEnd.HasValue == true)
+        {
+            var xMin = ChartMs(_detail.BedtimeStart.Value.AddHours(-1));
+            var xMax = ChartMs(_detail.BedtimeEnd.Value.AddHours(1));
+
+            var bedAnnotations = new List<AnnotationsXAxis>
+            {
+                new AnnotationsXAxis
+                {
+                    X           = ChartMs(_detail.BedtimeStart.Value),
+                    BorderColor = "#2d3436",
+                    BorderWidth = 2,
+                    Label       = new Label { Text = "Sleep", Style = new Style { Background = "#2d3436", Color = "#fff", FontSize = "10px" } },
+                },
+                new AnnotationsXAxis
+                {
+                    X           = ChartMs(_detail.BedtimeEnd.Value),
+                    BorderColor = "#6c5ce7",
+                    BorderWidth = 2,
+                    Label       = new Label { Text = "Wake", Style = new Style { Background = "#6c5ce7", Color = "#fff", FontSize = "10px" } },
+                },
+            };
+
+            _hrvOpts.Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "HH:mm" }, Min = xMin, Max = xMax };
+            _hrOpts.Xaxis  = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "HH:mm" }, Min = xMin, Max = xMax };
+            _hrvOpts.Annotations.Xaxis = bedAnnotations;
+            _hrOpts.Annotations.Xaxis  = bedAnnotations;
+        }
+
         if (_detail is not null)
         {
             _metrics = NightMetricsCalculator.Compute(_detail);
@@ -488,6 +518,12 @@ else
     {
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", _llmText);
     }
+
+    // Encode a DateTimeOffset as "local wall-clock time treated as UTC" so ApexCharts
+    // (which runs in datetimeUTC mode) displays the correct local HH:mm labels.
+    private static long ChartMs(DateTimeOffset dto) =>
+        new DateTimeOffset(DateTime.SpecifyKind(dto.ToLocalTime().DateTime, DateTimeKind.Utc))
+            .ToUnixTimeMilliseconds();
 
     private static string BuildLlmText(NightData d)
     {
