@@ -152,7 +152,7 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 |---|---|---|
 | `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
 | `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with "→" detail links |
-| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Sleep stage timeline bar, intra-night HRV & HR charts with Oura score markers, session detail row, daytime context, score contributors, **Custom Metrics card** (Real Recovery Score, HR % thresholds, HR settling time, HRV distribution, HRV direction), LLM-ready text export |
+| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Sleep stage timeline bar, intra-night HRV & HR charts with Oura score markers, session detail row, daytime context, score contributors, **Custom Metrics card** (Real Recovery Score, HR % thresholds, HR settling time, HRV distribution, HRV direction), **Raw data — copy to LLM card** (pre-formatted text dump of all scalars + full intra-night HR & HRV timeseries, single-click clipboard copy via `navigator.clipboard`) |
 | `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
 | `/metrics` | `MetricsGuide.razor` | ✅ Per-metric FAQ: formula, thresholds, rationale, calibration notes |
