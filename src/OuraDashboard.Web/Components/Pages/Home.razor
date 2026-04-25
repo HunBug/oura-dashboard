@@ -1,11 +1,10 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 
+@using ApexCharts
 @inject DashboardQueryService Query
 
-<PageTitle>Overview</PageTitle>
-
-<h1 class="mb-4">Overview — last 30 days</h1>
+<PageTitle>Home</PageTitle>
 
 @if (_loading)
 {
@@ -13,25 +12,322 @@
 }
 else
 {
-    <div class="row g-4">
-        @foreach (var overview in _overviews)
-        {
-            <div class="col-12 col-xl-6">
-                <UserCard Overview="overview" />
+    @* ── Zone 1: Last night header strip ───────────────────────────────────── *@
+    <div class="row g-3 mb-4">
+
+        @* Boo *@
+        <div class="col-12 col-md-6">
+            <div class="card border-start border-5 border-@_booRrsCss h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h5 class="mb-0">Boo</h5>
+                        @if (_booLast is not null)
+                        {
+                            <a href="@_booNightLink" class="btn btn-sm btn-outline-secondary">→ Boo's night</a>
+                        }
+                    </div>
+                    @if (_booLast is null)
+                    {
+                        <p class="text-muted small">No data</p>
+                    }
+                    else
+                    {
+                        <div class="row text-center g-2 align-items-end">
+                            <div class="col">
+                                <span class="badge bg-@_booRrsCss fs-5 px-3 py-2">@(_booRrs.HasValue ? _booRrs.Value.ToString() : "—")</span>
+                                <div class="text-muted small mt-1">RRS</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@Fmt(_booLast.AvgHrv)</div>
+                                <div class="text-muted small">HRV (ms)</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@FmtD(_booLast.HrAbove75Pct)</div>
+                                <div class="text-muted small">HR&nbsp;&gt;75%</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@Fmt(_booLast.RestorativeMinutes)</div>
+                                <div class="text-muted small">Restorative (min)</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@FmtTemp(_booLast.TempDeviation)</div>
+                                <div class="text-muted small">Temp (°C)</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small text-end">@_booLast.Day.ToString("dd MMM")</div>
+                    }
+                </div>
             </div>
-        }
+        </div>
+
+        @* Maa *@
+        <div class="col-12 col-md-6">
+            <div class="card border-start border-5 border-@_maaRrsCss h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h5 class="mb-0">Maa</h5>
+                        @if (_maaLast is not null)
+                        {
+                            <a href="@_maaNightLink" class="btn btn-sm btn-outline-secondary">→ Maa's night</a>
+                        }
+                    </div>
+                    @if (_maaLast is null)
+                    {
+                        <p class="text-muted small">No data</p>
+                    }
+                    else
+                    {
+                        <div class="row text-center g-2 align-items-end">
+                            <div class="col">
+                                <span class="badge bg-@_maaRrsCss fs-5 px-3 py-2">@(_maaRrs.HasValue ? _maaRrs.Value.ToString() : "—")</span>
+                                <div class="text-muted small mt-1">RRS</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@Fmt(_maaLast.AvgHrv)</div>
+                                <div class="text-muted small">HRV (ms)</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@FmtD(_maaLast.HrAbove75Pct)</div>
+                                <div class="text-muted small">HR&nbsp;&gt;75%</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@Fmt(_maaLast.RestorativeMinutes)</div>
+                                <div class="text-muted small">Restorative (min)</div>
+                            </div>
+                            <div class="col">
+                                <div class="fs-4 fw-bold">@FmtTemp(_maaLast.TempDeviation)</div>
+                                <div class="text-muted small">Temp (°C)</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small text-end">@_maaLast.Day.ToString("dd MMM")</div>
+                    }
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    @* ── Zone 2: 30-day comparison charts ──────────────────────────────────── *@
+    <div class="card mb-3">
+        <div class="card-header text-muted small">HRV (ms) — Boo left axis · Maa right axis</div>
+        <div class="card-body p-2">
+            <ApexChart TItem="DailyOverviewRow" Options="_hrvOpts" Height="220">
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="Boo HRV"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => r.AvgHrv" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="Maa HRV"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => r.AvgHrv" />
+            </ApexChart>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header text-muted small">HR above 75 bpm (%) — left axis &nbsp;·&nbsp; Respiratory rate (brpm) — right axis</div>
+        <div class="card-body p-2">
+            <ApexChart TItem="DailyOverviewRow" Options="_comboOpts" Height="220">
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="HR>75% Boo"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => (decimal?)r.HrAbove75Pct" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="HR>75% Maa"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => (decimal?)r.HrAbove75Pct" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="Resp Boo"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => (decimal?)r.AvgBreath" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="Resp Maa"
+                    SeriesType="SeriesType.Line"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => (decimal?)r.AvgBreath" />
+            </ApexChart>
+        </div>
+    </div>
+
+    @* ── Zone 3: Pattern callouts (deferred) ───────────────────────────────── *@
+    <!-- TODO: pattern callouts -->
 }
 
 @code {
     private bool _loading = true;
-    private List<UserOverview> _overviews = [];
+
+    private List<DailyOverviewRow> _booRows = [];
+    private List<DailyOverviewRow> _maaRows = [];
+
+    private DailyOverviewRow? _booLast;
+    private DailyOverviewRow? _maaLast;
+
+    private int?   _booRrs;
+    private int?   _maaRrs;
+    private string _booRrsCss    = "secondary";
+    private string _maaRrsCss    = "secondary";
+    private string _booNightLink = "#";
+    private string _maaNightLink = "#";
+
+    private ApexChartOptions<DailyOverviewRow> _hrvOpts   = new();
+    private ApexChartOptions<DailyOverviewRow> _comboOpts = new();
 
     protected override async Task OnInitializedAsync()
     {
-        var boo = await Query.GetUserOverviewAsync("Boo", 30);
-        var maa = await Query.GetUserOverviewAsync("Maa", 30);
-        _overviews = [boo, maa];
-        _loading = false;
+        var booOverview = await Query.GetUserOverviewAsync("Boo", 30);
+        var maaOverview = await Query.GetUserOverviewAsync("Maa", 30);
+
+        _booRows = booOverview.Rows;
+        _maaRows = maaOverview.Rows;
+
+        _booLast = _booRows.LastOrDefault(r => r.AvgHrv.HasValue || r.HrAbove75Pct.HasValue);
+        _maaLast = _maaRows.LastOrDefault(r => r.AvgHrv.HasValue || r.HrAbove75Pct.HasValue);
+
+        _booRrs    = ComputeRrs(_booLast);
+        _maaRrs    = ComputeRrs(_maaLast);
+        _booRrsCss = RrsCss(_booRrs, _booRows, _booLast);
+        _maaRrsCss = RrsCss(_maaRrs, _maaRows, _maaLast);
+
+        if (_booLast is not null) _booNightLink = $"night/Boo/{_booLast.Day:yyyy-MM-dd}";
+        if (_maaLast is not null) _maaNightLink = $"night/Maa/{_maaLast.Day:yyyy-MM-dd}";
+
+        _hrvOpts   = BuildHrvOpts();
+        _comboOpts = BuildComboOpts();
+        _loading   = false;
     }
+
+    // Approximates the Real Recovery Score from the summary fields available in DailyOverviewRow.
+    // Uses the same formula as NightMetricsCalculator but without per-sample timeseries.
+    // Score is re-normalised over available components so result is always 0–100.
+    private static int? ComputeRrs(DailyOverviewRow? r)
+    {
+        if (r is null) return null;
+
+        double weight = 0, score = 0;
+
+        if (r.HrAbove75Pct.HasValue)
+        {
+            score  += (1.0 - r.HrAbove75Pct.Value / 100.0) * 35;
+            weight += 35;
+        }
+        if (r.AvgHrv.HasValue)
+        {
+            score  += Math.Min(r.AvgHrv.Value / 20.0, 1.0) * 25;
+            weight += 25;
+        }
+        if (r.RestorativeMinutes.HasValue)
+        {
+            score  += Math.Min(r.RestorativeMinutes.Value / 150.0, 1.0) * 25;
+            weight += 25;
+        }
+        if (r.AvgBreath.HasValue)
+        {
+            double pts = r.AvgBreath.Value <= 14 ? 15
+                       : r.AvgBreath.Value >= 18 ? 0
+                       : (18.0 - r.AvgBreath.Value) / 4.0 * 15;
+            score  += pts;
+            weight += 15;
+        }
+
+        return weight < 0.001 ? null : (int)Math.Round(score / weight * 100);
+    }
+
+    // Green ≥ 95 % / amber ≥ 80 % / red < 80 % of the 14-night personal average
+    // (excluding the current night so we're not comparing against ourselves).
+    private static string RrsCss(int? rrs, List<DailyOverviewRow> rows, DailyOverviewRow? last)
+    {
+        if (!rrs.HasValue || last is null) return "secondary";
+
+        var baseline = rows
+            .Where(r => r != last && (r.AvgHrv.HasValue || r.HrAbove75Pct.HasValue))
+            .TakeLast(14)
+            .Select(r => (double?)ComputeRrs(r))
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .ToList();
+
+        if (baseline.Count < 3) return "secondary";
+
+        double avg   = baseline.Average();
+        double ratio = avg < 0.001 ? 0 : rrs.Value / avg;
+        return ratio >= 0.95 ? "success" : ratio >= 0.80 ? "warning" : "danger";
+    }
+
+    private static ApexChartOptions<DailyOverviewRow> BuildHrvOpts() => new()
+    {
+        Chart   = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+        Stroke  = new Stroke { Curve = Curve.Smooth, Width = [2, 2] },
+        Markers = new Markers { Size = [0, 0] },
+        Grid    = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+        Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" }, Shared = true },
+        Xaxis   = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+        Yaxis   =
+        [
+            new YAxis
+            {
+                SeriesName = "Boo HRV",
+                Labels     = new YAxisLabels { MinWidth = 30 },
+                Title      = new AxisTitle { Text = "Boo (ms)" },
+            },
+            new YAxis
+            {
+                SeriesName = "Maa HRV",
+                Opposite   = true,
+                Labels     = new YAxisLabels { MinWidth = 30 },
+                Title      = new AxisTitle { Text = "Maa (ms)" },
+            },
+        ],
+        Legend = new Legend { Show = true },
+    };
+
+    // 4-series chart: HR>75% Boo + Maa on left axis (0–100 %), Resp Boo + Maa on right axis (10–20 brpm).
+    // Series order in the markup must match: [HR>75% Boo, HR>75% Maa, Resp Boo, Resp Maa].
+    private static ApexChartOptions<DailyOverviewRow> BuildComboOpts() => new()
+    {
+        Chart   = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+        Stroke  = new Stroke { Curve = Curve.Smooth, Width = [2, 2, 2, 2] },
+        Markers = new Markers { Size = [0, 0, 0, 0] },
+        Grid    = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+        Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" }, Shared = true },
+        Xaxis   = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+        Yaxis   =
+        [
+            new YAxis
+            {
+                SeriesName = "HR>75% Boo",
+                Min        = 0,
+                Max        = 100,
+                Labels     = new YAxisLabels { MinWidth = 30 },
+                Title      = new AxisTitle { Text = "HR >75% (%)" },
+            },
+            new YAxis
+            {
+                SeriesName = "HR>75% Maa",
+                Show       = false,
+                Min        = 0,
+                Max        = 100,
+            },
+            new YAxis
+            {
+                SeriesName = "Resp Boo",
+                Opposite   = true,
+                Min        = 10,
+                Max        = 20,
+                Labels     = new YAxisLabels { MinWidth = 30 },
+                Title      = new AxisTitle { Text = "Resp (brpm)" },
+            },
+            new YAxis
+            {
+                SeriesName = "Resp Maa",
+                Opposite   = true,
+                Show       = false,
+                Min        = 10,
+                Max        = 20,
+            },
+        ],
+        Legend = new Legend { Show = true },
+    };
+
+    private static string Fmt(int? v)        => v.HasValue ? v.Value.ToString() : "—";
+    private static string FmtD(double? v)    => v.HasValue ? v.Value.ToString("F1") : "—";
+    private static string FmtTemp(double? v) => v.HasValue ? (v.Value >= 0 ? "+" : "") + v.Value.ToString("F2") : "—";
 }
