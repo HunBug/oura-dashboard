@@ -326,4 +326,82 @@ public class DashboardQueryService(OuraDbContext db)
         }
         return result;
     }
+
+    /// <summary>
+    /// Returns raw JSON strings for the given endpoint and date range.
+    /// Each element is the stored RawJson for one row (one API response object).
+    /// </summary>
+    /// <param name="endpoint">
+    ///   One of: daily_sleep, sleep, daily_readiness, daily_stress,
+    ///   daily_activity, vo2_max, daily_spo2, daily_resilience, workout.
+    /// </param>
+    public async Task<List<string>> GetRawExportAsync(
+        string userName,
+        DateOnly start,
+        DateOnly end,
+        string endpoint,
+        CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Name == userName, ct);
+        if (user is null) return [];
+
+        return endpoint switch
+        {
+            "daily_sleep" => await db.DailySleeps
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "sleep" => await db.SleepSessions
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "daily_readiness" => await db.DailyReadinesses
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "daily_stress" => await db.DailyStresses
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "daily_activity" => await db.DailyActivities
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "vo2_max" => await db.Vo2Maxes
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "daily_spo2" => await db.DailySpo2s
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "daily_resilience" => await db.DailyResilienceRecords
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            "workout" => await db.Workouts
+                .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+                .OrderBy(x => x.Day)
+                .Select(x => x.RawJson.RootElement.ToString())
+                .ToListAsync(ct),
+
+            _ => []
+        };
+    }
 }

@@ -192,7 +192,7 @@ Work can be broken into independent slices, roughly in priority order:
 5. ✅ **Home page Zone 1** — last night header strip, both users, 5 metrics + RRS color coding.
 6. ✅ **Home page Zone 2** — dual-axis HRV chart + 4-line combo chart.
 7. ✅ **`?` popovers** — `MetricHelp.razor` shared component; 8 metric keys; wired into Home, UserDetail, Compare table headers; `StatBox` extended with `HelpKey`; `initPopovers()` added to `App.razor`.
-8. 🔲 **Home page Zone 3** — pattern callout engine (most logic-heavy, defer last).
+8. ✅ **Home page Zone 3** — pattern callout engine: `BuildCallouts()` in `Home.razor`; 3 patterns: resp rate linear-slope trend (last 7 nights), HRV consecutive-improvement streak (≥3 nights), shared bad-night run detection (both users in `danger` zone ≥2 consecutive nights).
 
 Each slice is independently deployable and testable.
 

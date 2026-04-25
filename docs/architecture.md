@@ -176,7 +176,7 @@ See `docs/redesign-plan.md` for full detail on each page. Summary of route + com
 
 | Route | Purpose |
 |---|---|
-| `/raw` | Raw JSON export — select user, date range, endpoint; copy-paste to LLM |
+| `/raw` | `Raw.razor` | ✅ Done: user + date-range + endpoint selector; `GetRawExportAsync` in `DashboardQueryService`; JSON `<pre>` display + copy-to-clipboard button. |
 
 ### Services
 
@@ -353,7 +353,7 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 7. ✅ **Web: per-user detail page** — `UserDetail.razor`, 4 charts, per-night table, all scalar metrics
 8. ✅ **Web: compare page** — `Compare.razor`, overlaid charts, side-by-side per-night table
 9. ✅ **Custom metrics (on-the-fly)** — `NightMetricsCalculator.cs`: Real Recovery Score, HR % thresholds, HR settling time, HRV distribution/direction/peak; Oura score markers on HR/HRV charts; `/metrics` guide page
-10. 🔲 **Web: raw export page** — `/raw`, JSON download, copy-to-clipboard
+10. ✅ **Web: raw export page** — `/raw`, JSON download, copy-to-clipboard
 11. 🔲 **Custom metrics (trend layer)** — 7-day rolling averages on user overview; autonomic state trend line
 12. 🔲 **Deployment** — systemd unit file, full Docker Compose variant
 
@@ -375,11 +375,11 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - **Step 5+6 — Home page**: `Home.razor` rewritten; two-column last-night strip with RRS badge (14-day personal baseline color: green/amber/red), 4 other metrics per user, `→ Night` links; dual-axis HRV chart + 4-line combo chart (HR>75% + Resp both users).
 - **Step 7 — `?` popovers**: `MetricHelp.razor` shared component; 8 metric keys; Bootstrap 5 `data-bs-trigger="focus"` popovers; `initPopovers()` added to `App.razor`; wired into Home, UserDetail, Compare. `StatBox.razor` extended with optional `HelpKey`.
 - **NavMenu**: added “Boo’s History” and “Maa’s History” links.
+- **Step 8 — Home Zone 3**: `BuildCallouts()` in `Home.razor`; 3 pattern detectors: resp-rate linear-slope trend (last 7 nights with data), HRV consecutive-improvement streak (≥3 nights), shared bad-night run (≥2 consecutive nights where both users are in the `danger` zone vs. their 14-night baseline).
+- **Raw export page**: `Raw.razor` at `/raw`; `GetRawExportAsync()` added to `DashboardQueryService` (9 endpoint cases); user + date-range + endpoint selectors; JSON `<pre>` display; copy-to-clipboard via `navigator.clipboard.writeText`; added to NavMenu.
 
 ### 🔲 Still to do
 
-- **Step 8 — Home Zone 3**: Pattern callout engine — 3–4 auto-generated text observations. Requires trend-detection logic over loaded `DailyOverviewRow` lists; no new DB queries needed.
-- **Raw export page** (`/raw`): date-range JSON export / copy to LLM
 - **Deployment**: systemd unit, `docker-compose.full.yml`
 
 ---

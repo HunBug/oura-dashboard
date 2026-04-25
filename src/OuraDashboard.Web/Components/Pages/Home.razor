@@ -148,8 +148,19 @@ else
         </div>
     </div>
 
-    @* ── Zone 3: Pattern callouts (deferred) ───────────────────────────────── *@
-    <!-- TODO: pattern callouts -->
+    @* ── Zone 3: Pattern callouts ──────────────────────────────────────────── *@
+    @if (_callouts.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header text-muted small">Observations</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var msg in _callouts)
+                {
+                    <li class="list-group-item small">@msg</li>
+                }
+            </ul>
+        </div>
+    }
 }
 
 @code {
@@ -157,6 +168,7 @@ else
 
     private List<DailyOverviewRow> _booRows = [];
     private List<DailyOverviewRow> _maaRows = [];
+    private List<string>           _callouts = [];
 
     private DailyOverviewRow? _booLast;
     private DailyOverviewRow? _maaLast;
@@ -192,6 +204,7 @@ else
 
         _hrvOpts   = BuildHrvOpts();
         _comboOpts = BuildComboOpts();
+        _callouts  = BuildCallouts(_booRows, _maaRows);
         _loading   = false;
     }
 
@@ -330,4 +343,121 @@ else
     private static string Fmt(int? v)        => v.HasValue ? v.Value.ToString() : "—";
     private static string FmtD(double? v)    => v.HasValue ? v.Value.ToString("F1") : "—";
     private static string FmtTemp(double? v) => v.HasValue ? (v.Value >= 0 ? "+" : "") + v.Value.ToString("F2") : "—";
+
+    // ── Pattern callout engine ────────────────────────────────────────────────
+
+    private static List<string> BuildCallouts(
+        List<DailyOverviewRow> boo,
+        List<DailyOverviewRow> maa)
+    {
+        var msgs = new List<string>();
+
+        // 1. Resp rate trend for each person (last 7 days with data)
+        void AddRespTrend(string name, List<DailyOverviewRow> rows)
+        {
+            var pts = rows
+                .Where(r => r.AvgBreath.HasValue)
+                .TakeLast(7)
+                .ToList();
+            if (pts.Count < 3) return;
+
+            double slope = LinearSlope(pts.Select((r, i) => (i, r.AvgBreath!.Value)));
+            double totalChange = slope * (pts.Count - 1);
+            if (Math.Abs(totalChange) < 0.3) return;
+
+            string dir   = totalChange > 0 ? "risen" : "fallen";
+            string delta = Math.Abs(totalChange).ToString("F1");
+            msgs.Add($"{name}'s resp rate has {dir} by {delta} brpm over the last {pts.Count} nights.");
+        }
+        AddRespTrend("Boo", boo);
+        AddRespTrend("Maa", maa);
+
+        // 2. HRV consecutive improvement streak for each person
+        void AddHrvStreak(string name, List<DailyOverviewRow> rows)
+        {
+            var pts = rows
+                .Where(r => r.AvgHrv.HasValue)
+                .ToList();
+            if (pts.Count < 2) return;
+
+            int streak = 0;
+            for (int i = pts.Count - 1; i > 0; i--)
+            {
+                if (pts[i].AvgHrv!.Value > pts[i - 1].AvgHrv!.Value)
+                    streak++;
+                else
+                    break;
+            }
+            if (streak >= 3)
+                msgs.Add($"{name}'s HRV has been improving for {streak} consecutive nights.");
+        }
+        AddHrvStreak("Boo", boo);
+        AddHrvStreak("Maa", maa);
+
+        // 3. Shared bad nights: consecutive nights where BOTH users had low RRS vs. their baseline
+        var booRrsMap = BuildRrsMap(boo);
+        var maaRrsMap = BuildRrsMap(maa);
+        var sharedDays = booRrsMap.Keys
+            .Intersect(maaRrsMap.Keys)
+            .OrderBy(d => d)
+            .ToList();
+
+        var sharedBadRuns = FindConsecutiveRuns(
+            sharedDays,
+            d => booRrsMap[d] == "danger" && maaRrsMap[d] == "danger");
+        foreach (var run in sharedBadRuns)
+        {
+            string range = run.Count == 1
+                ? run[0].ToString("dd MMM")
+                : $"{run[0]:dd MMM}–{run[^1]:dd MMM}";
+            msgs.Add($"Both slept worse on {range} — possible shared environment event.");
+        }
+
+        return msgs;
+    }
+
+    // Returns a day → css-class map for every row that has a computed RRS.
+    private static Dictionary<DateOnly, string> BuildRrsMap(List<DailyOverviewRow> rows)
+    {
+        var result = new Dictionary<DateOnly, string>();
+        foreach (var r in rows)
+        {
+            int? rrs = ComputeRrs(r);
+            if (!rrs.HasValue) continue;
+            result[r.Day] = RrsCss(rrs, rows, r);
+        }
+        return result;
+    }
+
+    // Groups consecutive days that match a predicate into runs of length ≥ 2.
+    private static List<List<DateOnly>> FindConsecutiveRuns(
+        List<DateOnly> days,
+        Func<DateOnly, bool> predicate)
+    {
+        var runs  = new List<List<DateOnly>>();
+        var cur   = new List<DateOnly>();
+        foreach (var d in days)
+        {
+            if (predicate(d))
+            {
+                cur.Add(d);
+            }
+            else
+            {
+                if (cur.Count >= 2) runs.Add(new List<DateOnly>(cur));
+                cur.Clear();
+            }
+        }
+        if (cur.Count >= 2) runs.Add(cur);
+        return runs;
+    }
+
+    // Ordinary least-squares slope for a sequence of (x, y) pairs.
+    private static double LinearSlope(IEnumerable<(int x, double y)> pts)
+    {
+        double n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+        foreach (var (x, y) in pts) { n++; sx += x; sy += y; sxx += x * x; sxy += x * y; }
+        double denom = n * sxx - sx * sx;
+        return Math.Abs(denom) < 1e-9 ? 0 : (n * sxy - sx * sy) / denom;
+    }
 }

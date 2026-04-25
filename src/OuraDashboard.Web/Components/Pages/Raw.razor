@@ -1,0 +1,127 @@
+@page "/raw"
+@rendermode InteractiveServer
+
+@inject DashboardQueryService Query
+@inject IJSRuntime JS
+
+<PageTitle>Raw Export</PageTitle>
+
+<h4 class="mb-3">Raw JSON Export</h4>
+<p class="text-muted small mb-4">Select a user, date range, and endpoint to fetch the stored raw API payloads. Use the copy button to paste the result into an LLM.</p>
+
+<div class="row g-3 mb-4">
+
+    <div class="col-auto">
+        <label class="form-label small">User</label>
+        <select class="form-select form-select-sm" @bind="_user">
+            <option value="Boo">Boo</option>
+            <option value="Maa">Maa</option>
+        </select>
+    </div>
+
+    <div class="col-auto">
+        <label class="form-label small">From</label>
+        <input type="date" class="form-control form-control-sm" @bind="_start" />
+    </div>
+
+    <div class="col-auto">
+        <label class="form-label small">To</label>
+        <input type="date" class="form-control form-control-sm" @bind="_end" />
+    </div>
+
+    <div class="col-auto">
+        <label class="form-label small">Endpoint</label>
+        <select class="form-select form-select-sm" @bind="_endpoint">
+            @foreach (var (label, key) in _endpoints)
+            {
+                <option value="@key">@label</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-auto d-flex align-items-end">
+        <button class="btn btn-sm btn-primary" @onclick="ExportAsync" disabled="@_loading">
+            @if (_loading) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+            Export
+        </button>
+    </div>
+
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger small">@_error</div>
+}
+
+@if (_json is not null)
+{
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="text-muted small">@_rowCount row(s) · @_json.Length chars</span>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="CopyAsync">Copy to clipboard</button>
+    </div>
+    <pre class="border rounded p-3 bg-body-secondary" style="max-height:70vh; overflow:auto; font-size:0.78rem;">@_json</pre>
+}
+
+@code {
+    private static readonly (string Label, string Key)[] _endpoints =
+    [
+        ("daily_sleep",       "daily_sleep"),
+        ("sleep (sessions)",  "sleep"),
+        ("daily_readiness",   "daily_readiness"),
+        ("daily_stress",      "daily_stress"),
+        ("daily_activity",    "daily_activity"),
+        ("vo2_max",           "vo2_max"),
+        ("daily_spo2",        "daily_spo2"),
+        ("daily_resilience",  "daily_resilience"),
+        ("workout",           "workout"),
+    ];
+
+    private string   _user     = "Boo";
+    private string   _endpoint = "daily_sleep";
+    private DateTime _start    = DateTime.Today.AddDays(-30);
+    private DateTime _end      = DateTime.Today;
+
+    private bool    _loading  = false;
+    private string? _json     = null;
+    private int     _rowCount = 0;
+    private string? _error    = null;
+
+    private async Task ExportAsync()
+    {
+        _error = null;
+        _json  = null;
+
+        if (_start > _end)
+        {
+            _error = "Start date must be before end date.";
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var rows = await Query.GetRawExportAsync(
+                _user,
+                DateOnly.FromDateTime(_start),
+                DateOnly.FromDateTime(_end),
+                _endpoint);
+
+            _rowCount = rows.Count;
+            _json     = "[\n  " + string.Join(",\n  ", rows) + "\n]";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_json is null) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _json);
+    }
+}
