@@ -5,4 +5,7 @@
     <Project Path="src/OuraDashboard.Sync/OuraDashboard.Sync.csproj" />
     <Project Path="src/OuraDashboard.Web/OuraDashboard.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OuraDashboard.Tests/OuraDashboard.Tests.csproj" />
+  </Folder>
 </Solution>
