@@ -146,7 +146,7 @@ Thin console app — just parses args and calls `OuraSyncService`.
 Blazor Server (.NET 10). Uses `@rendermode InteractiveServer` throughout.
 Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS interop).
 
-### Pages — built ✅
+### Pages — current state ✅
 
 | Route | Component | Status |
 |---|---|---|
@@ -156,6 +156,21 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 | `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
 | `/metrics` | `MetricsGuide.razor` | ✅ Per-metric FAQ: formula, thresholds, rationale, calibration notes |
+
+### Pages — redesign target 🔲
+
+See `docs/redesign-plan.md` for full detail on each page. Summary of route + component changes:
+
+| Route | Component | Change | Notes |
+|---|---|---|---|
+| `/` | `Home.razor` | **Redesign** | Morning briefing: last-night verdict strip (both users, 5 metrics, RRS color), two 30-day comparison charts, zone for pattern callouts |
+| `/night/{name}/{day}` | `NightDetail.razor` | **Restructure** | Verdict bar → charts → 3 collapsible custom metric sections → Oura scores (collapsed) → daytime (collapsed) → raw (collapsed). Breadcrumb added. |
+| `/history/{name}` | new `History.razor` (from `UserDetail.razor`) | **Rename + enhance** | 2 consolidated charts, heatmap coloring on table, 7/14/30/90 day toggle |
+| `/compare` | `Compare.razor` | **Redesign** | Dual Y-axis HRV, clustered bar HR above 75%, correlation table |
+| `/sync` | `Sync.razor` | No change | Utility page |
+| `/metrics` | `MetricsGuide.razor` | **Remove from nav** | Content migrated to `?` popovers inline on each metric. Page stays accessible via footer link. |
+
+**Remove entirely (scaffold leftovers):** `Counter.razor`, `Weather.razor`, `UserCard.razor`.
 
 ### Pages — planned 🔲
 
