@@ -35,23 +35,23 @@ else
                         <div class="row text-center g-2 align-items-end">
                             <div class="col">
                                 <span class="badge bg-@_booRrsCss fs-5 px-3 py-2">@(_booRrs.HasValue ? _booRrs.Value.ToString() : "—")</span>
-                                <div class="text-muted small mt-1">RRS</div>
+                                <div class="text-muted small mt-1">RRS <MetricHelp Key="rrs" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@Fmt(_booLast.AvgHrv)</div>
-                                <div class="text-muted small">HRV (ms)</div>
+                                <div class="text-muted small">HRV (ms) <MetricHelp Key="hrv" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@FmtD(_booLast.HrAbove75Pct)</div>
-                                <div class="text-muted small">HR&nbsp;&gt;75%</div>
+                                <div class="text-muted small">HR&nbsp;&gt;75% <MetricHelp Key="hr75" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@Fmt(_booLast.RestorativeMinutes)</div>
-                                <div class="text-muted small">Restorative (min)</div>
+                                <div class="text-muted small">Restorative (min) <MetricHelp Key="restorative" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@FmtTemp(_booLast.TempDeviation)</div>
-                                <div class="text-muted small">Temp (°C)</div>
+                                <div class="text-muted small">Temp (°C) <MetricHelp Key="temp" /></div>
                             </div>
                         </div>
                         <div class="mt-2 text-muted small text-end">@_booLast.Day.ToString("dd MMM")</div>
@@ -80,23 +80,23 @@ else
                         <div class="row text-center g-2 align-items-end">
                             <div class="col">
                                 <span class="badge bg-@_maaRrsCss fs-5 px-3 py-2">@(_maaRrs.HasValue ? _maaRrs.Value.ToString() : "—")</span>
-                                <div class="text-muted small mt-1">RRS</div>
+                                <div class="text-muted small mt-1">RRS <MetricHelp Key="rrs" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@Fmt(_maaLast.AvgHrv)</div>
-                                <div class="text-muted small">HRV (ms)</div>
+                                <div class="text-muted small">HRV (ms) <MetricHelp Key="hrv" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@FmtD(_maaLast.HrAbove75Pct)</div>
-                                <div class="text-muted small">HR&nbsp;&gt;75%</div>
+                                <div class="text-muted small">HR&nbsp;&gt;75% <MetricHelp Key="hr75" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@Fmt(_maaLast.RestorativeMinutes)</div>
-                                <div class="text-muted small">Restorative (min)</div>
+                                <div class="text-muted small">Restorative (min) <MetricHelp Key="restorative" /></div>
                             </div>
                             <div class="col">
                                 <div class="fs-4 fw-bold">@FmtTemp(_maaLast.TempDeviation)</div>
-                                <div class="text-muted small">Temp (°C)</div>
+                                <div class="text-muted small">Temp (°C) <MetricHelp Key="temp" /></div>
                             </div>
                         </div>
                         <div class="mt-2 text-muted small text-end">@_maaLast.Day.ToString("dd MMM")</div>

@@ -150,12 +150,12 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 
 | Route | Component | Status |
 |---|---|---|
-| `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
+| `/` | `Home.razor` | ✅ **Redesigned (Steps 5–7)**: Two-column last-night strip (RRS badge with 14-day personal baseline color, HRV, HR>75%, Restorative, Temp), dual-axis HRV 30-day chart, 4-line combo chart (HR>75% + Resp, both users), pattern callout placeholder |
 | `/user/{name}` | `UserDetail.razor` | ✅ **Redesigned (Step 3)**: 7-stat summary, 2 charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), heatmap table, 7/14/30/90 day toggle, Oura scores toggle |
 | `/night/{name}/{day}` | `NightDetail.razor` | ✅ **Redesigned (Step 2)**: Verdict bar (RRS color + `GenerateSummary`), charts zone, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed), breadcrumb, prev/next nav |
 | `/compare` | `Compare.razor` | ✅ **Redesigned (Step 4)**: Dual Y-axis HRV, clustered bar HR>75%, resp rate + temp charts, zone-alignment correlation badge, heatmap table, 30/60/90 day toggle |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
-| `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Page still exists; not yet dissolved into `?` popovers (Step 7). |
+| `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Content dissolved into `MetricHelp.razor` `?` popovers (Step 7). Page still exists at `/metrics` as a reference; not linked from primary nav. |
 
 ### Pages — redesign target 🔲
 
@@ -163,12 +163,12 @@ See `docs/redesign-plan.md` for full detail on each page. Summary of route + com
 
 | Route | Component | Change | Status |
 |---|---|---|---|
-| `/` | `Home.razor` | **Redesign** | 🔲 Pending (Steps 5–6) |
+| `/` | `Home.razor` | **Redesign** | ✅ Done (Steps 5–7) |
 | `/night/{name}/{day}` | `NightDetail.razor` | **Restructure** | ✅ Done (Step 2) |
 | `/user/{name}` | `UserDetail.razor` | **Enhance** | ✅ Done (Step 3) |
 | `/compare` | `Compare.razor` | **Redesign** | ✅ Done (Step 4) |
 | `/sync` | `Sync.razor` | No change | ✅ No action needed |
-| `/metrics` | `MetricsGuide.razor` | **Remove from nav → `?` popovers** | 🔲 Pending (Step 7) |
+| `/metrics` | `MetricsGuide.razor` | **Remove from nav → `?` popovers** | ✅ Done (Step 7) |
 
 **Removed entirely (Step 1):** `Counter.razor`, `Weather.razor`. `UserCard.razor` kept (used on Home).
 
@@ -372,13 +372,13 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - **Step 2 — Night page redesign**: `NightDetail.razor` restructured (verdict bar, 3 collapsible metric sections, Oura scores collapsed, daytime collapsed, raw data collapsed, breadcrumb, `GenerateSummary`)
 - **Step 3 — History page**: `UserDetail.razor` updated (2 charts, heatmap table, day toggle, Oura scores toggle, `HrAbove75Pct` + `RestorativeMinutes` added to `DailyOverviewRow`)
 - **Step 4 — Compare page**: `Compare.razor` rewritten (dual Y-axis HRV, clustered bar, correlation badge, heatmap, day toggle)
+- **Step 5+6 — Home page**: `Home.razor` rewritten; two-column last-night strip with RRS badge (14-day personal baseline color: green/amber/red), 4 other metrics per user, `→ Night` links; dual-axis HRV chart + 4-line combo chart (HR>75% + Resp both users).
+- **Step 7 — `?` popovers**: `MetricHelp.razor` shared component; 8 metric keys; Bootstrap 5 `data-bs-trigger="focus"` popovers; `initPopovers()` added to `App.razor`; wired into Home, UserDetail, Compare. `StatBox.razor` extended with optional `HelpKey`.
+- **NavMenu**: added “Boo’s History” and “Maa’s History” links.
 
 ### 🔲 Still to do
 
-- **Step 5 — Home page Zone 1**: Two-column morning briefing (last night, both users, 5 metrics, RRS color vs 14-day personal baseline)
-- **Step 6 — Home page Zone 2**: Dual-axis HRV trend chart + 4-line combo chart (HR>75% + Resp)
-- **Step 7 — `?` popovers**: Dissolve MetricsGuide into inline Bootstrap 5 popovers on every metric label
-- **Step 8 — Home Zone 3**: Pattern callout engine (deferred last)
+- **Step 8 — Home Zone 3**: Pattern callout engine — 3–4 auto-generated text observations. Requires trend-detection logic over loaded `DailyOverviewRow` lists; no new DB queries needed.
 - **Raw export page** (`/raw`): date-range JSON export / copy to LLM
 - **Deployment**: systemd unit, `docker-compose.full.yml`
 

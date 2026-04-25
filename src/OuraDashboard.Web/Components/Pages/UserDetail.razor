@@ -41,13 +41,13 @@ else
 
     @* ── Aggregate stats ── *@
     <div class="row text-center mb-4 g-3">
-        <StatBox Label="HRV (ms)"     Value="@Fmt(AvgHrv)" />
-        <StatBox Label="Nocturnal HR" Value="@FmtD(AvgHr)" />
+        <StatBox Label="HRV (ms)"     Value="@Fmt(AvgHrv)"    HelpKey="hrv" />
+        <StatBox Label="Nocturnal HR" Value="@FmtD(AvgHr)"    HelpKey="hr-avg" />
         <StatBox Label="Lowest HR"    Value="@Fmt(AvgLowestHr)" />
-        <StatBox Label="Resp (brpm)"  Value="@FmtD(AvgBreath)" />
+        <StatBox Label="Resp (brpm)"  Value="@FmtD(AvgBreath)" HelpKey="resp" />
         <StatBox Label="Deep (min)"   Value="@Fmt(AvgDeep)" />
         <StatBox Label="REM (min)"    Value="@Fmt(AvgRem)" />
-        <StatBox Label="Awake (min)"  Value="@Fmt(AvgAwake)" />
+        <StatBox Label="Awake (min)"  Value="@Fmt(AvgAwake)"   HelpKey="awake" />
     </div>
 
     @* ── Chart section toggle ── *@
@@ -128,15 +128,15 @@ else
                             <th>Date</th>
                             <th class="text-end">Sleep</th>
                             <th class="text-end">Ready</th>
-                            <th class="text-end">HRV</th>
-                            <th class="text-end">Avg HR</th>
-                            <th class="text-end">HR&nbsp;&gt;75%</th>
-                            <th class="text-end">Resp</th>
+                            <th class="text-end">HRV <MetricHelp Key="hrv" /></th>
+                            <th class="text-end">Avg HR <MetricHelp Key="hr-avg" /></th>
+                            <th class="text-end">HR&nbsp;&gt;75% <MetricHelp Key="hr75" /></th>
+                            <th class="text-end">Resp <MetricHelp Key="resp" /></th>
                             <th class="text-end">Deep</th>
                             <th class="text-end">REM</th>
-                            <th class="text-end">Restor.</th>
-                            <th class="text-end">Awake</th>
-                            <th class="text-end">Temp&nbsp;°C</th>
+                            <th class="text-end">Restor. <MetricHelp Key="restorative" /></th>
+                            <th class="text-end">Awake <MetricHelp Key="awake" /></th>
+                            <th class="text-end">Temp&nbsp;°C <MetricHelp Key="temp" /></th>
                             <th></th>
                         </tr>
                     </thead>

@@ -1,0 +1,67 @@
+@* Inline ? button that shows a Bootstrap 5 popover with metric explanation.
+   Key must be one of the keys in the static _items dictionary below.
+   Popover is initialized via JS after first render. *@
+
+@inject IJSRuntime JS
+
+<button type="button"
+        class="btn btn-link btn-sm p-0 ms-1 text-muted align-baseline"
+        style="font-size:0.72rem; line-height:1; vertical-align:baseline;"
+        data-bs-toggle="popover"
+        data-bs-trigger="focus"
+        data-bs-placement="top"
+        data-bs-title="@_title"
+        data-bs-content="@_content"
+        tabindex="0"
+        aria-label="Help: @_title">?</button>
+
+@code {
+    // All popover content is static server-side strings — no user input, no XSS risk.
+    private static readonly Dictionary<string, (string Title, string Content)> _items = new()
+    {
+        ["rrs"] = (
+            "Real Recovery Score (0–100)",
+            "Composite of 4 components: HR below 75 bpm (35 pts), avg HRV up to 20 ms (25 pts), restorative sleep up to 150 min (25 pts), resp rate ≤14 brpm (15 pts). Re-normalised over available components. Color uses your 14-day personal average: green ≥95%, amber 80–95%, red <80%."),
+        ["hrv"] = (
+            "HRV (ms)",
+            "Heart Rate Variability during sleep — higher is better for recovery. A single average hides distribution: check HRV direction and zones on the Night page for the full picture."),
+        ["hr75"] = (
+            "HR above 75 bpm (%)",
+            "% of sleep-source HR samples above 75 bpm. Oura's 'lowest HR' can coexist with 70% of the night elevated. <10% = good; 10–30% = moderate; >30% = elevated."),
+        ["restorative"] = (
+            "Restorative Sleep (Deep + REM)",
+            "Deep and REM minutes combined. Both stages suppress together on bad nights (stress, illness, alcohol). Target: ≥150 min = good, ≥90 min = moderate, <60 min = concern."),
+        ["temp"] = (
+            "Temp deviation (°C)",
+            "Skin temperature deviation from your 30-day baseline. Positive spikes can signal illness onset or luteal phase in the menstrual cycle."),
+        ["resp"] = (
+            "Respiratory rate (brpm)",
+            "Average breaths per minute during sleep. Lower = better parasympathetic state. RRS awards full points at ≤14 brpm, zero at ≥18 brpm."),
+        ["hr-avg"] = (
+            "Nocturnal HR avg (bpm)",
+            "Mean HR across the sleep session. A 67 bpm average could mean HR stayed calm all night or swung between 85 and 49 bpm — the average hides the distribution."),
+        ["awake"] = (
+            "Awake minutes",
+            "Raw awake time in the session. More meaningful alongside time-in-bed: 90% efficiency on 5h = 27 min awake; on 9h = 54 min awake — same percentage, very different experience."),
+    };
+
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+
+    private string _title   = "";
+    private string _content = "";
+
+    protected override void OnParametersSet()
+    {
+        if (_items.TryGetValue(Key, out var item))
+        {
+            _title   = item.Title;
+            _content = item.Content;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("initPopovers");
+    }
+}

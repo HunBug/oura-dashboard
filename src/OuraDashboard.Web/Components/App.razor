@@ -26,6 +26,13 @@
                 bootstrap.Tooltip.getOrCreateInstance(el);
             });
         }
+        function initPopovers() {
+            document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+                bootstrap.Popover.getOrCreateInstance(el);
+            });
+        }
+        // Re-init after Blazor enhanced navigation replaces DOM content.
+        document.addEventListener('DOMContentLoaded', function () { initPopovers(); initTooltips(); });
     </script>
 </body>
 

@@ -1,10 +1,11 @@
-@* Reusable stat box: large value + small label *@
+@* Reusable stat box: large value + small label, with optional ? popover. *@
 <div class="col">
     <div class="fs-2 fw-bold">@Value</div>
-    <div class="text-muted small">@Label</div>
+    <div class="text-muted small">@Label@if (!string.IsNullOrEmpty(HelpKey)) { <MetricHelp Key="@HelpKey" /> }</div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? HelpKey { get; set; }
 }

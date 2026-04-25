@@ -189,9 +189,9 @@ Work can be broken into independent slices, roughly in priority order:
 2. ✅ **Night page restructure** — `NightDetail.razor` restructured into 6 zones: verdict bar (green/amber/red + `GenerateSummary`), charts, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed). Computed properties replace `@{}` inline blocks.
 3. ✅ **History page** — `UserDetail.razor` updated: 2 consolidated charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), heatmap coloring on all table columns (HSL, per-column range), 7/14/30/90 day toggle (90 disabled if <60 rows), Oura scores toggle (off by default). `DailyOverviewRow` extended with `HrAbove75Pct` and `RestorativeMinutes`; HR>75% computed via batch `HeartRateSample` query.
 4. ✅ **Compare page** — `Compare.razor` rewritten: dual Y-axis HRV, clustered bar HR>75%, resp rate + temp deviation line charts, zone-alignment correlation badge, heatmap per-column per-user (separate scale), 30/60/90 day toggle.
-5. 🔲 **Home page Zone 1** — last night header strip, both users, 5 metrics + RRS color coding.
-6. 🔲 **Home page Zone 2** — dual-axis HRV chart + 4-line combo chart.
-7. 🔲 **`?` popovers** — wire existing MetricsGuide content to inline popovers across all pages.
+5. ✅ **Home page Zone 1** — last night header strip, both users, 5 metrics + RRS color coding.
+6. ✅ **Home page Zone 2** — dual-axis HRV chart + 4-line combo chart.
+7. ✅ **`?` popovers** — `MetricHelp.razor` shared component; 8 metric keys; wired into Home, UserDetail, Compare table headers; `StatBox` extended with `HelpKey`; `initPopovers()` added to `App.razor`.
 8. 🔲 **Home page Zone 3** — pattern callout engine (most logic-heavy, defer last).
 
 Each slice is independently deployable and testable.
