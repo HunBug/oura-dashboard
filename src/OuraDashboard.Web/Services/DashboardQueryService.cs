@@ -16,7 +16,9 @@ public record DailyOverviewRow(
     int? DeepMinutes,
     int? RemMinutes,
     int? AwakeMinutes,
-    double? TempDeviation);
+    double? TempDeviation,
+    double? HrAbove75Pct,
+    int? RestorativeMinutes);
 
 public record UserOverview(
     string UserName,
@@ -125,6 +127,8 @@ public class DashboardQueryService(OuraDbContext db)
                 x.DeepSleepDuration,
                 x.RemSleepDuration,
                 x.AwakeTime,
+                x.BedtimeStart,
+                x.BedtimeEnd,
             })
             .ToListAsync(ct);
 
@@ -136,12 +140,42 @@ public class DashboardQueryService(OuraDbContext db)
                        .ThenByDescending(s => (s.DeepSleepDuration ?? 0) + (s.RemSleepDuration ?? 0))
                        .First());
 
+        // Batch-load sleep-source HR samples for the period to compute HrAbove75Pct per night.
+        var hrAbove75ByDay = new Dictionary<DateOnly, double?>();
+        if (sessionByDay.Count > 0)
+        {
+            var windowStart = sessionByDay.Values.Min(s => s.BedtimeStart);
+            var windowEnd   = sessionByDay.Values.Max(s => s.BedtimeEnd);
+            var hrSamples   = await db.HeartRateSamples
+                .Where(x => x.UserId == user.Id
+                         && x.Source == "sleep"
+                         && x.Timestamp >= windowStart
+                         && x.Timestamp <= windowEnd)
+                .Select(x => new { x.Timestamp, x.Bpm })
+                .ToListAsync(ct);
+
+            foreach (var (day, sess) in sessionByDay)
+            {
+                var sessHr = hrSamples
+                    .Where(h => h.Timestamp >= sess.BedtimeStart && h.Timestamp <= sess.BedtimeEnd)
+                    .ToList();
+                hrAbove75ByDay[day] = sessHr.Count > 0
+                    ? sessHr.Count(h => h.Bpm > 75) * 100.0 / sessHr.Count
+                    : null;
+            }
+        }
+
         var rows = new List<DailyOverviewRow>();
         for (var day = start; day <= end; day = day.AddDays(1))
         {
             scores.TryGetValue(day, out var score);
             readiness.TryGetValue(day, out var r);
             sessionByDay.TryGetValue(day, out var s);
+            hrAbove75ByDay.TryGetValue(day, out var hrAbove75);
+
+            int? restorative = null;
+            if (s is not null && (s.DeepSleepDuration.HasValue || s.RemSleepDuration.HasValue))
+                restorative = ((s.DeepSleepDuration ?? 0) + (s.RemSleepDuration ?? 0)) / 60;
 
             rows.Add(new DailyOverviewRow(
                 Day: day,
@@ -154,7 +188,9 @@ public class DashboardQueryService(OuraDbContext db)
                 DeepMinutes: s?.DeepSleepDuration is int d ? d / 60 : null,
                 RemMinutes: s?.RemSleepDuration is int rem ? rem / 60 : null,
                 AwakeMinutes: s?.AwakeTime is int a ? a / 60 : null,
-                TempDeviation: r?.TemperatureDeviation
+                TempDeviation: r?.TemperatureDeviation,
+                HrAbove75Pct: hrAbove75,
+                RestorativeMinutes: restorative
             ));
         }
 

@@ -5,7 +5,18 @@
 
 <PageTitle>Compare — Boo vs Maa</PageTitle>
 
-<h2 class="mb-4">Compare — Boo vs Maa, last 30 days</h2>
+<div class="d-flex align-items-center mb-3 gap-3 flex-wrap">
+    <h2 class="mb-0 flex-grow-1">Compare — Boo vs Maa</h2>
+    <div class="btn-group btn-group-sm" role="group">
+        @foreach (var n in new[] { 30, 60, 90 })
+        {
+            var nn = n;
+            <button type="button"
+                    class="btn @(_numDays == nn ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SetDays(nn)">@nn days</button>
+        }
+    </div>
+</div>
 
 @if (_loading)
 {
@@ -13,33 +24,16 @@
 }
 else
 {
-    @* ── Side-by-side sleep score chart ── *@
-    <div class="card mb-4">
-        <div class="card-header text-muted small">Sleep score</div>
+    @* ── Chart 1: HRV — dual Y-axis ── *@
+    <div class="card mb-3">
+        <div class="card-header text-muted small">HRV (ms) — Boo left axis · Maa right axis</div>
         <div class="card-body p-2">
-            <ApexChart TItem="DailyOverviewRow" Options="_chartOpts" Height="220">
-                <ApexPointSeries TItem="DailyOverviewRow" Items="_boo.Rows" Name="Boo"
-                    SeriesType="SeriesType.Line"
-                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
-                    YValue="r => r.SleepScore" />
-                <ApexPointSeries TItem="DailyOverviewRow" Items="_maa.Rows" Name="Maa"
-                    SeriesType="SeriesType.Line"
-                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
-                    YValue="r => r.SleepScore" />
-            </ApexChart>
-        </div>
-    </div>
-
-    @* ── HRV comparison chart ── *@
-    <div class="card mb-4">
-        <div class="card-header text-muted small">HRV (ms)</div>
-        <div class="card-body p-2">
-            <ApexChart TItem="DailyOverviewRow" Options="_hrvOpts" Height="200">
-                <ApexPointSeries TItem="DailyOverviewRow" Items="_boo.Rows" Name="Boo"
+            <ApexChart TItem="DailyOverviewRow" Options="_hrvOpts" Height="220">
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="Boo HRV"
                     SeriesType="SeriesType.Line"
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                     YValue="r => r.AvgHrv" />
-                <ApexPointSeries TItem="DailyOverviewRow" Items="_maa.Rows" Name="Maa"
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="Maa HRV"
                     SeriesType="SeriesType.Line"
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                     YValue="r => r.AvgHrv" />
@@ -47,44 +41,115 @@ else
         </div>
     </div>
 
-    @* ── Per-night table ── *@
+    @* ── Chart 2: HR above 75% — clustered bar ── *@
+    <div class="card mb-3">
+        <div class="card-header text-muted small">HR above 75 bpm (%)</div>
+        <div class="card-body p-2">
+            <ApexChart TItem="DailyOverviewRow" Options="_hr75Opts" Height="200">
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="Boo"
+                    SeriesType="SeriesType.Bar"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => (decimal?)r.HrAbove75Pct" />
+                <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="Maa"
+                    SeriesType="SeriesType.Bar"
+                    XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                    YValue="r => (decimal?)r.HrAbove75Pct" />
+            </ApexChart>
+        </div>
+    </div>
+
+    @* ── Charts 3 & 4: Resp rate + Temp deviation ── *@
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header text-muted small">Respiratory rate (brpm)</div>
+                <div class="card-body p-2">
+                    <ApexChart TItem="DailyOverviewRow" Options="_respOpts" Height="180">
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="Boo"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => (decimal?)r.AvgBreath" />
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="Maa"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => (decimal?)r.AvgBreath" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header text-muted small">Temp deviation (°C)</div>
+                <div class="card-body p-2">
+                    <ApexChart TItem="DailyOverviewRow" Options="_tempOpts" Height="180">
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_booRows" Name="Boo"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => (decimal?)r.TempDeviation" />
+                        <ApexPointSeries TItem="DailyOverviewRow" Items="_maaRows" Name="Maa"
+                            SeriesType="SeriesType.Line"
+                            XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
+                            YValue="r => (decimal?)r.TempDeviation" />
+                    </ApexChart>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Correlation summary ── *@
+    @if (_correlationNights > 0)
+    {
+        <div class="alert alert-secondary py-2 mb-3 small">
+            <strong>Zone alignment:</strong> @_sameZoneNights / @_correlationNights shared nights in the same HRV zone
+            (@((_sameZoneNights * 100.0 / _correlationNights).ToString("F0"))%).
+            "Same zone" = both above or both below their personal median HRV.
+        </div>
+    }
+
+    @* ── Per-night comparison table ── *@
     <div class="card">
         <div class="card-header fw-semibold">Per-night comparison</div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-sm table-striped mb-0">
+                <table class="table table-sm mb-0">
                     <thead>
                         <tr>
                             <th rowspan="2" class="align-middle">Date</th>
-                            <th colspan="4" class="text-center border-start">Boo</th>
-                            <th colspan="4" class="text-center border-start">Maa</th>
+                            <th colspan="5" class="text-center border-start">Boo</th>
+                            <th colspan="5" class="text-center border-start">Maa</th>
+                            <th rowspan="2" class="align-middle text-center" title="Both in same HRV zone">Zone</th>
                         </tr>
                         <tr>
                             <th class="text-end border-start">Sleep</th>
                             <th class="text-end">HRV</th>
-                            <th class="text-end">HR</th>
+                            <th class="text-end">HR&nbsp;&gt;75%</th>
                             <th class="text-end">Resp</th>
+                            <th class="text-end">Temp</th>
                             <th class="text-end border-start">Sleep</th>
                             <th class="text-end">HRV</th>
-                            <th class="text-end">HR</th>
+                            <th class="text-end">HR&nbsp;&gt;75%</th>
                             <th class="text-end">Resp</th>
+                            <th class="text-end">Temp</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var day in _days)
+                        @foreach (var day in _dates)
                         {
                             var b = _booByDay.GetValueOrDefault(day);
                             var m = _maaByDay.GetValueOrDefault(day);
                             <tr>
                                 <td>@day.ToString("dd MMM")</td>
-                                <td class="text-end border-start">@Fmt(b?.SleepScore)</td>
-                                <td class="text-end">@Fmt(b?.AvgHrv)</td>
-                                <td class="text-end">@FmtD(b?.AvgHr)</td>
-                                <td class="text-end">@FmtD(b?.AvgBreath)</td>
-                                <td class="text-end border-start">@Fmt(m?.SleepScore)</td>
-                                <td class="text-end">@Fmt(m?.AvgHrv)</td>
-                                <td class="text-end">@FmtD(m?.AvgHr)</td>
-                                <td class="text-end">@FmtD(m?.AvgBreath)</td>
+                                <td class="text-end border-start" style="@BooStyle(b?.SleepScore, "sleep", true)">@Fmt(b?.SleepScore)</td>
+                                <td class="text-end" style="@BooStyle(b?.AvgHrv, "hrv", true)">@Fmt(b?.AvgHrv)</td>
+                                <td class="text-end" style="@BooStyle(b?.HrAbove75Pct, "hr75", false)">@FmtD(b?.HrAbove75Pct)</td>
+                                <td class="text-end" style="@BooStyle(b?.AvgBreath, "resp", false)">@FmtD(b?.AvgBreath)</td>
+                                <td class="text-end" style="@BooStyle(b?.TempDeviation, "temp", false)">@FmtTemp(b?.TempDeviation)</td>
+                                <td class="text-end border-start" style="@MaaStyle(m?.SleepScore, "sleep", true)">@Fmt(m?.SleepScore)</td>
+                                <td class="text-end" style="@MaaStyle(m?.AvgHrv, "hrv", true)">@Fmt(m?.AvgHrv)</td>
+                                <td class="text-end" style="@MaaStyle(m?.HrAbove75Pct, "hr75", false)">@FmtD(m?.HrAbove75Pct)</td>
+                                <td class="text-end" style="@MaaStyle(m?.AvgBreath, "resp", false)">@FmtD(m?.AvgBreath)</td>
+                                <td class="text-end" style="@MaaStyle(m?.TempDeviation, "temp", false)">@FmtTemp(m?.TempDeviation)</td>
+                                <td class="text-center">@ZoneIcon(b, m)</td>
                             </tr>
                         }
                     </tbody>
@@ -96,53 +161,178 @@ else
 
 @code {
     private bool _loading = true;
-    private UserOverview _boo = new("Boo", []);
-    private UserOverview _maa = new("Maa", []);
+    private UserOverview _allBoo = new("Boo", []);
+    private UserOverview _allMaa = new("Maa", []);
 
-    private List<DateOnly> _days = [];
+    private List<DailyOverviewRow> _booRows = [];
+    private List<DailyOverviewRow> _maaRows = [];
+    private List<DateOnly>         _dates   = [];
     private Dictionary<DateOnly, DailyOverviewRow> _booByDay = [];
     private Dictionary<DateOnly, DailyOverviewRow> _maaByDay = [];
 
-    private ApexChartOptions<DailyOverviewRow> _chartOpts = null!;
-    private ApexChartOptions<DailyOverviewRow> _hrvOpts = null!;
+    private int    _numDays = 30;
+    private int    _correlationNights;
+    private int    _sameZoneNights;
+    private double _booMedianHrv;
+    private double _maaMedianHrv;
+
+    private Dictionary<string, (double Min, double Max)> _booRanges = [];
+    private Dictionary<string, (double Min, double Max)> _maaRanges = [];
+
+    private ApexChartOptions<DailyOverviewRow> _hrvOpts  = null!;
+    private ApexChartOptions<DailyOverviewRow> _hr75Opts = null!;
+    private ApexChartOptions<DailyOverviewRow> _respOpts = null!;
+    private ApexChartOptions<DailyOverviewRow> _tempOpts = null!;
 
     protected override async Task OnInitializedAsync()
     {
-        _boo = await Query.GetUserOverviewAsync("Boo", 30);
-        _maa = await Query.GetUserOverviewAsync("Maa", 30);
-
-        // Build union of all days, descending
-        _booByDay = _boo.Rows.ToDictionary(r => r.Day);
-        _maaByDay = _maa.Rows.ToDictionary(r => r.Day);
-        _days = _booByDay.Keys.Union(_maaByDay.Keys).OrderByDescending(d => d).ToList();
-
-        _chartOpts = new ApexChartOptions<DailyOverviewRow>
-        {
-            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
-            Stroke = new Stroke { Curve = Curve.Smooth, Width = [2] },
-            Markers = new Markers { Size = [0] },
-            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
-            Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" } },
-            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
-            Yaxis = [new YAxis { Min = 0, Max = 100, Labels = new YAxisLabels { MinWidth = 30 } }],
-            Legend = new Legend { Show = true },
-        };
-
-        _hrvOpts = new ApexChartOptions<DailyOverviewRow>
-        {
-            Chart = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
-            Stroke = new Stroke { Curve = Curve.Smooth, Width = [2] },
-            Markers = new Markers { Size = [0] },
-            Grid = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
-            Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" } },
-            Xaxis = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
-            Yaxis = [new YAxis { Labels = new YAxisLabels { MinWidth = 30 } }],
-            Legend = new Legend { Show = true },
-        };
-
+        _allBoo = await Query.GetUserOverviewAsync("Boo", 90);
+        _allMaa = await Query.GetUserOverviewAsync("Maa", 90);
+        ApplyDays();
         _loading = false;
     }
 
-    private static string Fmt(int? v)     => v.HasValue ? v.Value.ToString() : "—";
-    private static string FmtD(double? v) => v.HasValue ? v.Value.ToString("F1") : "—";
+    private void SetDays(int d) { _numDays = d; ApplyDays(); }
+
+    private void ApplyDays()
+    {
+        _booRows  = _allBoo.Rows.TakeLast(_numDays).ToList();
+        _maaRows  = _allMaa.Rows.TakeLast(_numDays).ToList();
+        _booByDay = _booRows.ToDictionary(r => r.Day);
+        _maaByDay = _maaRows.ToDictionary(r => r.Day);
+        _dates    = _booByDay.Keys.Union(_maaByDay.Keys).OrderByDescending(d => d).ToList();
+
+        ComputeMedians();
+        ComputeCorrelation();
+        ComputeRanges();
+
+        _hrvOpts  = BuildHrvDualOpts();
+        _hr75Opts = BuildBarOpts(0, 100);
+        _respOpts = BuildLineOpts(null, null);
+        _tempOpts = BuildLineOpts(null, null);
+    }
+
+    private void ComputeMedians()
+    {
+        var bv = _booRows.Where(r => r.AvgHrv.HasValue).Select(r => (double)r.AvgHrv!.Value).OrderBy(x => x).ToList();
+        var mv = _maaRows.Where(r => r.AvgHrv.HasValue).Select(r => (double)r.AvgHrv!.Value).OrderBy(x => x).ToList();
+        _booMedianHrv = bv.Count == 0 ? 0 : bv[bv.Count / 2];
+        _maaMedianHrv = mv.Count == 0 ? 0 : mv[mv.Count / 2];
+    }
+
+    private void ComputeCorrelation()
+    {
+        _correlationNights = 0;
+        _sameZoneNights    = 0;
+        foreach (var day in _dates)
+        {
+            if (!_booByDay.TryGetValue(day, out var b) || !_maaByDay.TryGetValue(day, out var m)) continue;
+            if (b.AvgHrv is null || m.AvgHrv is null) continue;
+            _correlationNights++;
+            if ((b.AvgHrv.Value >= _booMedianHrv) == (m.AvgHrv.Value >= _maaMedianHrv))
+                _sameZoneNights++;
+        }
+    }
+
+    private void ComputeRanges()
+    {
+        _booRanges = new Dictionary<string, (double, double)>
+        {
+            ["sleep"] = Range(_booRows.Select(r => (double?)r.SleepScore)),
+            ["hrv"]   = Range(_booRows.Select(r => (double?)r.AvgHrv)),
+            ["hr75"]  = Range(_booRows.Select(r => r.HrAbove75Pct)),
+            ["resp"]  = Range(_booRows.Select(r => r.AvgBreath)),
+            ["temp"]  = Range(_booRows.Select(r => r.TempDeviation)),
+        };
+        _maaRanges = new Dictionary<string, (double, double)>
+        {
+            ["sleep"] = Range(_maaRows.Select(r => (double?)r.SleepScore)),
+            ["hrv"]   = Range(_maaRows.Select(r => (double?)r.AvgHrv)),
+            ["hr75"]  = Range(_maaRows.Select(r => r.HrAbove75Pct)),
+            ["resp"]  = Range(_maaRows.Select(r => r.AvgBreath)),
+            ["temp"]  = Range(_maaRows.Select(r => r.TempDeviation)),
+        };
+    }
+
+    private static (double Min, double Max) Range(IEnumerable<double?> vals)
+    {
+        var v = vals.Where(x => x.HasValue).Select(x => x!.Value).ToList();
+        return v.Count < 2 ? (0, 1) : (v.Min(), v.Max());
+    }
+
+    private string BooStyle(double? v, string col, bool higher) => Heatmap(v, col, higher, _booRanges);
+    private string BooStyle(int? v,    string col, bool higher) => Heatmap((double?)v, col, higher, _booRanges);
+    private string MaaStyle(double? v, string col, bool higher) => Heatmap(v, col, higher, _maaRanges);
+    private string MaaStyle(int? v,    string col, bool higher) => Heatmap((double?)v, col, higher, _maaRanges);
+
+    private static string Heatmap(double? v, string col, bool higher,
+        Dictionary<string, (double Min, double Max)> ranges)
+    {
+        if (v is null || !ranges.TryGetValue(col, out var r)) return string.Empty;
+        var span = r.Max - r.Min;
+        if (span < 0.001) return string.Empty;
+        var ratio = (v.Value - r.Min) / span;
+        if (!higher) ratio = 1 - ratio;
+        return $"background-color: hsl({(int)(ratio * 120)}, 60%, 92%);";
+    }
+
+    private string ZoneIcon(DailyOverviewRow? b, DailyOverviewRow? m)
+    {
+        if (b?.AvgHrv is null || m?.AvgHrv is null) return "";
+        return (b.AvgHrv.Value >= _booMedianHrv) == (m.AvgHrv.Value >= _maaMedianHrv) ? "✓" : "✗";
+    }
+
+    private static ApexChartOptions<DailyOverviewRow> BuildHrvDualOpts() => new()
+    {
+        Chart   = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+        Stroke  = new Stroke { Curve = Curve.Smooth, Width = [2, 2] },
+        Markers = new Markers { Size = [0, 0] },
+        Grid    = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+        Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" }, Shared = true },
+        Xaxis   = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+        Yaxis   =
+        [
+            new YAxis
+            {
+                SeriesName = "Boo HRV",
+                Labels     = new YAxisLabels { MinWidth = 30 },
+                Title      = new AxisTitle { Text = "Boo (ms)" },
+            },
+            new YAxis
+            {
+                SeriesName = "Maa HRV",
+                Opposite   = true,
+                Labels     = new YAxisLabels { MinWidth = 30 },
+                Title      = new AxisTitle { Text = "Maa (ms)" },
+            },
+        ],
+        Legend = new Legend { Show = true },
+    };
+
+    private static ApexChartOptions<DailyOverviewRow> BuildBarOpts(int? yMin, int? yMax) => new()
+    {
+        Chart       = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+        PlotOptions = new PlotOptions { Bar = new PlotOptionsBar { ColumnWidth = "60%" } },
+        Grid        = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+        Tooltip     = new Tooltip { X = new TooltipX { Format = "dd MMM" }, Shared = true },
+        Xaxis       = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+        Yaxis       = [new YAxis { Min = yMin, Max = yMax, Labels = new YAxisLabels { MinWidth = 30 } }],
+        Legend      = new Legend { Show = true },
+    };
+
+    private static ApexChartOptions<DailyOverviewRow> BuildLineOpts(int? yMin, int? yMax) => new()
+    {
+        Chart   = new Chart { Toolbar = new Toolbar { Show = false }, Background = "transparent" },
+        Stroke  = new Stroke { Curve = Curve.Smooth, Width = [2, 2] },
+        Markers = new Markers { Size = [0, 0] },
+        Grid    = new Grid { BorderColor = "#e0e0e0", Row = new GridRow { Opacity = 0 } },
+        Tooltip = new Tooltip { X = new TooltipX { Format = "dd MMM" }, Shared = true },
+        Xaxis   = new XAxis { Type = XAxisType.Datetime, Labels = new XAxisLabels { Format = "dd MMM" } },
+        Yaxis   = [new YAxis { Min = yMin, Max = yMax, Labels = new YAxisLabels { MinWidth = 30 } }],
+        Legend  = new Legend { Show = true },
+    };
+
+    private static string Fmt(int? v)        => v.HasValue ? v.Value.ToString() : "—";
+    private static string FmtD(double? v)    => v.HasValue ? v.Value.ToString("F1") : "—";
+    private static string FmtTemp(double? v) => v.HasValue ? (v.Value >= 0 ? "+" : "") + v.Value.ToString("F2") : "—";
 }

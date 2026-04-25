@@ -151,26 +151,26 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 | Route | Component | Status |
 |---|---|---|
 | `/` | `Home.razor` | ✅ Side-by-side user cards, 30-day sparklines (sleep score + HRV), 7 aggregate stats each, "Detail →" link per user |
-| `/user/{name}` | `UserDetail.razor` | ✅ 9-stat summary, 4 charts (sleep+readiness, HRV, HR+lowest HR, respiratory rate), per-night table with "→" detail links |
-| `/night/{name}/{day}` | `NightDetail.razor` | ✅ Sleep stage timeline bar, intra-night HRV & HR charts with Oura score markers, session detail row, daytime context, score contributors, **Custom Metrics card** (Real Recovery Score, HR % thresholds, HR settling time, HRV distribution, HRV direction), **Raw data — copy to LLM card** (pre-formatted text dump of all scalars + full intra-night HR & HRV timeseries, single-click clipboard copy via `navigator.clipboard`) |
-| `/compare` | `Compare.razor` | ✅ Sleep score + HRV overlay charts (both users), side-by-side per-night table |
+| `/user/{name}` | `UserDetail.razor` | ✅ **Redesigned (Step 3)**: 7-stat summary, 2 charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), heatmap table, 7/14/30/90 day toggle, Oura scores toggle |
+| `/night/{name}/{day}` | `NightDetail.razor` | ✅ **Redesigned (Step 2)**: Verdict bar (RRS color + `GenerateSummary`), charts zone, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed), breadcrumb, prev/next nav |
+| `/compare` | `Compare.razor` | ✅ **Redesigned (Step 4)**: Dual Y-axis HRV, clustered bar HR>75%, resp rate + temp charts, zone-alignment correlation badge, heatmap table, 30/60/90 day toggle |
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
-| `/metrics` | `MetricsGuide.razor` | ✅ Per-metric FAQ: formula, thresholds, rationale, calibration notes |
+| `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Page still exists; not yet dissolved into `?` popovers (Step 7). |
 
 ### Pages — redesign target 🔲
 
 See `docs/redesign-plan.md` for full detail on each page. Summary of route + component changes:
 
-| Route | Component | Change | Notes |
+| Route | Component | Change | Status |
 |---|---|---|---|
-| `/` | `Home.razor` | **Redesign** | Morning briefing: last-night verdict strip (both users, 5 metrics, RRS color), two 30-day comparison charts, zone for pattern callouts |
-| `/night/{name}/{day}` | `NightDetail.razor` | **Restructure** | Verdict bar → charts → 3 collapsible custom metric sections → Oura scores (collapsed) → daytime (collapsed) → raw (collapsed). Breadcrumb added. |
-| `/history/{name}` | new `History.razor` (from `UserDetail.razor`) | **Rename + enhance** | 2 consolidated charts, heatmap coloring on table, 7/14/30/90 day toggle |
-| `/compare` | `Compare.razor` | **Redesign** | Dual Y-axis HRV, clustered bar HR above 75%, correlation table |
-| `/sync` | `Sync.razor` | No change | Utility page |
-| `/metrics` | `MetricsGuide.razor` | **Remove from nav** | Content migrated to `?` popovers inline on each metric. Page stays accessible via footer link. |
+| `/` | `Home.razor` | **Redesign** | 🔲 Pending (Steps 5–6) |
+| `/night/{name}/{day}` | `NightDetail.razor` | **Restructure** | ✅ Done (Step 2) |
+| `/user/{name}` | `UserDetail.razor` | **Enhance** | ✅ Done (Step 3) |
+| `/compare` | `Compare.razor` | **Redesign** | ✅ Done (Step 4) |
+| `/sync` | `Sync.razor` | No change | ✅ No action needed |
+| `/metrics` | `MetricsGuide.razor` | **Remove from nav → `?` popovers** | 🔲 Pending (Step 7) |
 
-**Remove entirely (scaffold leftovers):** `Counter.razor`, `Weather.razor`, `UserCard.razor`.
+**Removed entirely (Step 1):** `Counter.razor`, `Weather.razor`. `UserCard.razor` kept (used on Home).
 
 ### Pages — planned 🔲
 
@@ -189,7 +189,9 @@ See `docs/redesign-plan.md` for full detail on each page. Summary of route + com
 - Days with no data return a row with all-null metrics (so charts show gaps rather than missing points).
 
 **`DailyOverviewRow`** record fields:
-`Day`, `SleepScore`, `ReadinessScore`, `AvgHrv`, `AvgHr`, `LowestHr`, `AvgBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `TempDeviation`
+`Day`, `SleepScore`, `ReadinessScore`, `AvgHrv`, `AvgHr`, `LowestHr`, `AvgBreath`, `DeepMinutes`, `RemMinutes`, `AwakeMinutes`, `TempDeviation`, `HrAbove75Pct`, `RestorativeMinutes`
+
+> `HrAbove75Pct` and `RestorativeMinutes` were added in Step 3. `HrAbove75Pct` is computed via a batched `HeartRateSample` query (sleep-source samples only, windowed to session bedtime); `RestorativeMinutes = (Deep + REM) / 60`.
 
 **`NightData`** record fields:
 `UserName`, `Day`, `SleepScore`, `ReadinessScore`, `TempDeviation`, `TempTrendDeviation`,
@@ -357,34 +359,28 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 
 ---
 
-## Implementation status (last updated: 2026-04-17)
+## Implementation status (last updated: 2026-04-25)
 
 ### ✅ Done
 
-- Solution scaffold: `OuraDashboard.slnx` (4 projects, project references, `.slnx` format — .NET 10 default)
-- Central Package Management via `Directory.Packages.props` — all NuGet versions pinned there, no `Version=` in `.csproj` files
-- `Directory.Build.props` with `<AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>` (.NET 10 workaround)
-- EF Core 10.0.4 + Npgsql.EF 10.0.1 (pinned to avoid `MSB3277` version conflict; `dotnet-ef` global tool also at 10.0.6)
-- All 9 EF Core entities in `src/OuraDashboard.Data/Entities/`
-- `OuraDbContext` with Fluent API (JSONB columns, unique indexes, FK)
-- `OuraDbContextFactory` for design-time migrations
-- `InitialSchema` migration created and applied
-- `docker-compose.yml` — Postgres 17 on port 5433, healthcheck, `pgdata` volume
-- `OuraOptions` config model (`SectionName = "Oura"`, `Users`, `SyncIntervalMinutes`, `SyncLookbackDays`)
-- `OuraApiClient` — thin HTTP wrapper, returns `(JsonDocument? Doc, bool IsNotFound)` tuple
-- `OuraSyncService` — syncs all 8 endpoints per user, upsert on natural keys, returns `SyncResult`
-- `ISyncTrigger` / `SyncState` / `SyncBackgroundService` — timer + `Channel<bool>` manual trigger
-- `Sync.ServiceCollectionExtensions` — `AddOuraSync(addBackgroundService: bool)`
-- `Data.ServiceCollectionExtensions` — `AddOuraDatabase(connectionString)`
-- `Sync.Cli/Program.cs` — `--days N`, `--migrate` flags
-- **End-to-end sync verified with real Oura tokens** — 90 days of data for both users
+- Solution scaffold, Central Package Management, EF Core entities, migrations, Docker Compose
+- Full sync pipeline (all endpoints, upsert, `SyncBackgroundService`, CLI)
+- End-to-end sync verified with real Oura tokens (90 days, both users)
+- **Blazor UI — all initial pages** built and working
+- **Unit tests** — 25 tests for `NightMetricsCalculator` / RRS formula in `tests/OuraDashboard.Tests` (xUnit)
+- **Step 1 — Nav cleanup**: `MetricsGuide` removed from nav; `Counter.razor` + `Weather.razor` deleted
+- **Step 2 — Night page redesign**: `NightDetail.razor` restructured (verdict bar, 3 collapsible metric sections, Oura scores collapsed, daytime collapsed, raw data collapsed, breadcrumb, `GenerateSummary`)
+- **Step 3 — History page**: `UserDetail.razor` updated (2 charts, heatmap table, day toggle, Oura scores toggle, `HrAbove75Pct` + `RestorativeMinutes` added to `DailyOverviewRow`)
+- **Step 4 — Compare page**: `Compare.razor` rewritten (dual Y-axis HRV, clustered bar, correlation badge, heatmap, day toggle)
 
-### ❌ Not started yet
+### 🔲 Still to do
 
-- `src/OuraDashboard.Web/Program.cs` — needs `AddOuraDatabase()`, `AddOuraSync(addBackgroundService: true)`, `Configure<OuraOptions>()`
-- All Blazor pages: `/sync`, `/raw`, `/`, `/user/{name}`, `/compare`
-- Chart.js JS interop setup
-- Deployment: systemd unit, `docker-compose.full.yml`
+- **Step 5 — Home page Zone 1**: Two-column morning briefing (last night, both users, 5 metrics, RRS color vs 14-day personal baseline)
+- **Step 6 — Home page Zone 2**: Dual-axis HRV trend chart + 4-line combo chart (HR>75% + Resp)
+- **Step 7 — `?` popovers**: Dissolve MetricsGuide into inline Bootstrap 5 popovers on every metric label
+- **Step 8 — Home Zone 3**: Pattern callout engine (deferred last)
+- **Raw export page** (`/raw`): date-range JSON export / copy to LLM
+- **Deployment**: systemd unit, `docker-compose.full.yml`
 
 ---
 

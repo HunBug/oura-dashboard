@@ -184,15 +184,15 @@ Replace the dedicated `MetricsGuide` nav entry with `?` icons on every metric la
 
 Work can be broken into independent slices, roughly in priority order:
 
-0. **RRS formula** — prerequisite for steps 5 and Night verdict bar. Agree on formula, implement as a service method, write unit tests with known-good nights.
-1. **Nav cleanup** — remove `Metrics Guide` from nav; remove scaffold pages (`Counter`, `Weather`, `UserCard`).
-2. **Night page restructure** — zone ordering + collapsible sections. No new data needed.
-3. **History page** — heatmap coloring on table + 2 consolidated charts + date toggle.
-4. **Compare page** — dual Y-axis HRV + clustered bar HR + correlation table.
-5. **Home page Zone 1** — last night header strip, both users, 5 metrics + RRS color coding.
-6. **Home page Zone 2** — dual-axis HRV chart + 4-line combo chart.
-7. **`?` popovers** — wire existing MetricsGuide content to inline popovers across all pages. Use Bootstrap 5 `Popover` (already a dependency; `focus` trigger works on mobile tap without JS complexity).
-8. **Home page Zone 3** — pattern callout engine (most logic-heavy, defer last).
+0. ✅ **RRS formula** — implemented in `NightMetrics.cs`; 25 unit tests in `tests/OuraDashboard.Tests`.
+1. ✅ **Nav cleanup** — `MetricsGuide` removed from nav; `Counter.razor`, `Weather.razor` deleted.
+2. ✅ **Night page restructure** — `NightDetail.razor` restructured into 6 zones: verdict bar (green/amber/red + `GenerateSummary`), charts, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed). Computed properties replace `@{}` inline blocks.
+3. ✅ **History page** — `UserDetail.razor` updated: 2 consolidated charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), heatmap coloring on all table columns (HSL, per-column range), 7/14/30/90 day toggle (90 disabled if <60 rows), Oura scores toggle (off by default). `DailyOverviewRow` extended with `HrAbove75Pct` and `RestorativeMinutes`; HR>75% computed via batch `HeartRateSample` query.
+4. ✅ **Compare page** — `Compare.razor` rewritten: dual Y-axis HRV, clustered bar HR>75%, resp rate + temp deviation line charts, zone-alignment correlation badge, heatmap per-column per-user (separate scale), 30/60/90 day toggle.
+5. 🔲 **Home page Zone 1** — last night header strip, both users, 5 metrics + RRS color coding.
+6. 🔲 **Home page Zone 2** — dual-axis HRV chart + 4-line combo chart.
+7. 🔲 **`?` popovers** — wire existing MetricsGuide content to inline popovers across all pages.
+8. 🔲 **Home page Zone 3** — pattern callout engine (most logic-heavy, defer last).
 
 Each slice is independently deployable and testable.
 

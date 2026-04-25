@@ -17,10 +17,33 @@ else if (_detail is null)
 }
 else
 {
-    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
-        <a href="/user/@UserName" class="btn btn-sm btn-outline-secondary">← @UserName overview</a>
+    @* ── Zone 1: Verdict bar ── *@
+    <div class="@VerdictBg px-4 py-3 mb-3 rounded d-flex align-items-center flex-wrap gap-3">
+        <div class="flex-grow-1">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1" style="opacity:0.8;">
+                    <li class="breadcrumb-item"><a href="/" class="text-reset text-decoration-underline">Home</a></li>
+                    <li class="breadcrumb-item"><a href="/user/@UserName" class="text-reset text-decoration-underline">@UserName</a></li>
+                    <li class="breadcrumb-item active">@_detail.Day.ToString("MMM d")</li>
+                </ol>
+            </nav>
+            <div class="fw-bold fs-5">@_detail.Day.ToString("dddd, dd MMM yyyy")</div>
+            @if (!string.IsNullOrEmpty(Summary))
+            {
+                <div class="mt-1 fst-italic" style="opacity:0.9;">@Summary</div>
+            }
+        </div>
+        @if (RrsVal.HasValue)
+        {
+            <div class="text-center ms-auto">
+                <div class="display-5 fw-bold lh-1">@RrsVal</div>
+                <div class="small opacity-75">RRS / 100</div>
+            </div>
+        }
+    </div>
 
-        @* prev / next night navigation *@
+    @* ── Prev/next night navigation ── *@
+    <div class="d-flex align-items-center gap-2 mb-4">
         @if (_prevDay.HasValue)
         {
             <a href="/night/@UserName/@_prevDay.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-outline-secondary">‹ Prev night</a>
@@ -29,9 +52,7 @@ else
         {
             <span class="btn btn-sm btn-outline-secondary disabled">‹ Prev night</span>
         }
-
-        <h2 class="mb-0 flex-grow-1 text-center">@UserName — @_detail.Day.ToString("dddd, dd MMM yyyy")</h2>
-
+        <span class="flex-grow-1"></span>
         @if (_nextDay.HasValue)
         {
             <a href="/night/@UserName/@_nextDay.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-outline-secondary">Next night ›</a>
@@ -42,44 +63,7 @@ else
         }
     </div>
 
-    @* ── Stats row ── *@
-    <div class="row text-center mb-4 g-2">
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.SleepScore)</div><div class="text-muted small">Sleep score</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.ReadinessScore)</div><div class="text-muted small">Readiness</div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AverageHrv)</div><div class="text-muted small">HRV avg (ms) <a href="/metrics#oura-hrv-avg" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Average conceals distribution — same avg can hide flat calm vs chaotic 5/45 ms swings">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageHeartRate)</div><div class="text-muted small">Avg HR (bpm) <a href="/metrics#oura-hr-avg" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Average conceals distribution — 67 avg could mean flat-67 or 85 first half / 49 second half">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.LowestHeartRate)</div><div class="text-muted small">Lowest HR <a href="/metrics#oura-lowest-hr" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="A brief dip to 56 bpm can coexist with 70% of the night above 75 bpm — not representative on its own">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageBreath)</div><div class="text-muted small">Resp (brpm) <a href="/metrics#resp-rate" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Changes slowly over days. Sustained +1 brpm can precede illness by 1–3 days">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.DeepMinutes)</div><div class="text-muted small">Deep (min) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM = restorative sleep. Both stages count toward the 150-min target">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.RemMinutes)</div><div class="text-muted small">REM (min) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM = restorative sleep. Both stages count toward the 150-min target">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AwakeMinutes)</div><div class="text-muted small">Awake (min) <a href="/metrics#awake-time" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Raw count. See the custom metrics card below for awake % of time in bed, which is duration-independent">(?)</a></div></div>
-        <div class="col"><div class="fs-3 fw-bold">@FmtTemp(_detail.TempDeviation)</div><div class="text-muted small">Temp dev <a href="/metrics#temp-dev" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Single-night deviation from your baseline. Multi-day trend direction is more predictive of illness or cycle phase">(?)</a></div></div>
-    </div>
-
-    @* ── Session details row ── *@
-    <div class="row text-center mb-3 g-2">
-        @if (_detail.BedtimeStart.HasValue && _detail.BedtimeEnd.HasValue)
-        {
-            <div class="col">
-                <div class="fs-5 fw-bold">@_detail.BedtimeStart.Value.ToLocalTime().ToString("HH:mm") – @_detail.BedtimeEnd.Value.ToLocalTime().ToString("HH:mm")</div>
-                <div class="text-muted small">Bedtime window</div>
-            </div>
-        }
-        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TotalSleepMinutes)</div><div class="text-muted small">Total sleep</div></div>
-        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LightSleepMinutes)</div><div class="text-muted small">Light (min)</div></div>
-        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TimeInBedMinutes)</div><div class="text-muted small">Time in bed</div></div>
-        <div class="col"><div class="fs-5 fw-bold">@(_detail.Efficiency.HasValue ? _detail.Efficiency + "%" : "—")</div><div class="text-muted small">Efficiency <a href="/metrics#efficiency" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Sleep ÷ time-in-bed × 100%. 90% on 5h vs 9h is very different — the percentage hides the duration">(?)</a></div></div>
-        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LatencyMinutes)</div><div class="text-muted small">Sleep latency</div></div>
-        <div class="col"><div class="fs-5 fw-bold">@(_detail.RestlessPeriods?.ToString() ?? "—")</div><div class="text-muted small">Restless periods</div></div>
-        @if (_detail.TempTrendDeviation.HasValue)
-        {
-            <div class="col">
-                <div class="fs-5 fw-bold @(_detail.TempTrendDeviation >= 0 ? "text-warning" : "text-info")">@((_detail.TempTrendDeviation >= 0 ? "+" : "") + _detail.TempTrendDeviation.Value.ToString("F2")) °C</div>
-                <div class="text-muted small">Temp trend</div>
-            </div>
-        }
-    </div>
-
+    @* ── Zone 2: Charts (before metric breakdown) ── *@
     @* ── Sleep stage timeline ── *@
     @if (!string.IsNullOrEmpty(_detail.SleepPhase5Min))
     {
@@ -134,240 +118,294 @@ else
         </div>
     }
 
-    @* ── Custom Metrics ── *@
+    @* ── Zone 3: Custom Metrics ── *@
     @if (_metrics is not null)
     {
         <div class="card mb-4 border-primary">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold text-primary">Custom Metrics</span>
-                <a href="/metrics" class="btn btn-sm btn-outline-primary">? Guide</a>
-            </div>
+            <div class="card-header fw-semibold text-primary">Custom Metrics</div>
             <div class="card-body">
 
-                @* Real Recovery Score *@
+                @* RRS sits above the three collapsible sections *@
                 @if (_metrics.RealRecoveryScore.HasValue)
                 {
-                    var rrs = _metrics.RealRecoveryScore.Value;
-                    var rrsColor = rrs >= 75 ? "text-success" : rrs >= 50 ? "text-warning" : "text-danger";
-                    <div class="text-center mb-4">
-                        <div class="display-4 fw-bold @rrsColor">@rrs<small class="fs-5 text-muted"> / 100</small></div>
+                    var rrsColor = _metrics.RealRecoveryScore.Value >= 75 ? "text-success"
+                        : _metrics.RealRecoveryScore.Value >= 50 ? "text-warning" : "text-danger";
+                    <div class="text-center mb-4 pb-3 border-bottom">
+                        <div class="display-4 fw-bold @rrsColor">@_metrics.RealRecoveryScore.Value<small class="fs-5 text-muted"> / 100</small></div>
                         <div class="text-muted small">Real Recovery Score <a href="/metrics#rrs" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Composite: HR below 75 bpm (35 pts) + HRV avg (25 pts) + restorative sleep (25 pts) + resp rate (15 pts)">(?)</a></div>
                     </div>
                 }
 
-                @* HR section *@
-                @if (_metrics.HrAbove75Pct.HasValue || _metrics.HrSettlingMinutes.HasValue)
+                @* Cardiovascular (open by default) *@
+                @if (_metrics.HrAbove75Pct.HasValue || _metrics.HrSettlingMinutes.HasValue || _metrics.HrEarlyHalfAvg.HasValue)
                 {
-                    <div class="mb-2 text-muted small fw-semibold text-uppercase">Cardiovascular</div>
-                    <div class="row text-center g-2 mb-4">
-                        @if (_metrics.HrAbove75Pct.HasValue)
-                        {
-                            var p75Color = _metrics.HrAbove75Pct.Value > 50 ? "text-danger" : _metrics.HrAbove75Pct.Value > 20 ? "text-warning" : "text-success";
-                            <div class="col">
-                                <div class="fs-4 fw-bold @p75Color">@_metrics.HrAbove75Pct.Value.ToString("F1")%</div>
-                                <div class="text-muted small">HR above 75 bpm <a href="/metrics#hr75" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="% of the night HR exceeded 75 bpm — sustained sympathetic activation; the core cardiovascular recovery indicator">(?)</a></div>
-                            </div>
-                        }
-                        @if (_metrics.HrAbove80Pct.HasValue)
-                        {
-                            var p80Color = _metrics.HrAbove80Pct.Value > 30 ? "text-danger" : _metrics.HrAbove80Pct.Value > 10 ? "text-warning" : "text-success";
-                            <div class="col">
-                                <div class="fs-4 fw-bold @p80Color">@_metrics.HrAbove80Pct.Value.ToString("F1")%</div>
-                                <div class="text-muted small">HR above 80 bpm <a href="/metrics#hr80" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Stricter threshold: truly elevated HR. &gt;20% here is a clear concern">(?)</a></div>
-                            </div>
-                        }
-                        @if (_metrics.HrSettlingMinutes.HasValue)
-                        {
-                            var settleColor = _metrics.HrSettlingMinutes.Value > 60 ? "text-danger" : _metrics.HrSettlingMinutes.Value > 30 ? "text-warning" : "text-success";
-                            <div class="col">
-                                <div class="fs-4 fw-bold @settleColor">@_metrics.HrSettlingMinutes.Value min</div>
-                                <div class="text-muted small">HR settling time <a href="/metrics#settling" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Minutes from bedtime until HR first holds below 75 bpm: 3 consecutive 5-min samples all ≤75">(?)</a></div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="col">
-                                <div class="fs-4 fw-bold text-danger">Never</div>
-                                <div class="text-muted small">HR settling (HR never below 75) <a href="/metrics#settling" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="HR never held below 75 bpm for 3+ consecutive 5-min samples all night">(?)</a></div>
-                            </div>
-                        }
-                    </div>
-
-                    @* HR half-night comparison and curve shape *@
-                    @if (_metrics.HrEarlyHalfAvg.HasValue && _metrics.HrLateHalfAvg.HasValue)
-                    {
-                        var hrShapeColor = (_metrics.HrShape == "settled" || _metrics.HrShape == "calm") ? "text-success"
-                            : _metrics.HrShape == "elevated" ? "text-danger" : "text-warning";
-                        var hrShapeSymbol = _metrics.HrShape switch
-                        {
-                            "settled"  => "↓",
-                            "calm"     => "─",
-                            "elevated" => "─",
-                            "variable" => "↑",
-                            _          => ""
-                        };
-                        <div class="row text-center g-2 mb-2">
-                            <div class="col">
-                                <div class="fs-5 fw-bold">@_metrics.HrEarlyHalfAvg.Value.ToString("F1") bpm</div>
-                                <div class="text-muted small">HR early-night avg</div>
-                            </div>
-                            <div class="col">
-                                <div class="fs-5 fw-bold">@_metrics.HrLateHalfAvg.Value.ToString("F1") bpm</div>
-                                <div class="text-muted small">HR late-night avg</div>
-                            </div>
-                            <div class="col">
-                                <div class="fs-5 fw-bold @hrShapeColor">@hrShapeSymbol @_metrics.HrShape</div>
-                                <div class="text-muted small">HR curve shape <a href="/metrics#hr-shape" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="settled↓ = was high, came down | elevated─ = stayed high | calm─ = low all night | variable↑ = rose late">(?)</a></div>
-                            </div>
+                    <details open class="mb-3">
+                        <summary class="mb-2 fw-semibold text-uppercase small text-muted" style="cursor:pointer;">Cardiovascular</summary>
+                        <div class="row text-center g-2 mt-1 mb-3">
+                            @if (_metrics.HrAbove75Pct.HasValue)
+                            {
+                                var p75Color = _metrics.HrAbove75Pct.Value > 50 ? "text-danger" : _metrics.HrAbove75Pct.Value > 20 ? "text-warning" : "text-success";
+                                <div class="col">
+                                    <div class="fs-4 fw-bold @p75Color">@_metrics.HrAbove75Pct.Value.ToString("F1")%</div>
+                                    <div class="text-muted small">HR above 75 bpm <a href="/metrics#hr75" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="% of the night HR exceeded 75 bpm — sustained sympathetic activation; the core cardiovascular recovery indicator">(?)</a></div>
+                                </div>
+                            }
+                            @if (_metrics.HrAbove80Pct.HasValue)
+                            {
+                                var p80Color = _metrics.HrAbove80Pct.Value > 30 ? "text-danger" : _metrics.HrAbove80Pct.Value > 10 ? "text-warning" : "text-success";
+                                <div class="col">
+                                    <div class="fs-4 fw-bold @p80Color">@_metrics.HrAbove80Pct.Value.ToString("F1")%</div>
+                                    <div class="text-muted small">HR above 80 bpm <a href="/metrics#hr80" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Stricter threshold: truly elevated HR. &gt;20% here is a clear concern">(?)</a></div>
+                                </div>
+                            }
+                            @if (_metrics.HrSettlingMinutes.HasValue)
+                            {
+                                var settleColor = _metrics.HrSettlingMinutes.Value > 60 ? "text-danger" : _metrics.HrSettlingMinutes.Value > 30 ? "text-warning" : "text-success";
+                                <div class="col">
+                                    <div class="fs-4 fw-bold @settleColor">@_metrics.HrSettlingMinutes.Value min</div>
+                                    <div class="text-muted small">HR settling time <a href="/metrics#settling" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Minutes from bedtime until HR first holds below 75 bpm: 3 consecutive 5-min samples all ≤75">(?)</a></div>
+                                </div>
+                            }
+                            else if (_metrics.HrAbove75Pct.HasValue)
+                            {
+                                <div class="col">
+                                    <div class="fs-4 fw-bold text-danger">Never</div>
+                                    <div class="text-muted small">HR settling (HR never below 75) <a href="/metrics#settling" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="HR never held below 75 bpm for 3+ consecutive 5-min samples all night">(?)</a></div>
+                                </div>
+                            }
                         </div>
-                    }
+                        @if (_metrics.HrEarlyHalfAvg.HasValue && _metrics.HrLateHalfAvg.HasValue)
+                        {
+                            var hrShapeColor = (_metrics.HrShape == "settled" || _metrics.HrShape == "calm") ? "text-success"
+                                : _metrics.HrShape == "elevated" ? "text-danger" : "text-warning";
+                            var hrShapeSymbol = _metrics.HrShape switch
+                            {
+                                "settled"  => "↓",
+                                "calm"     => "─",
+                                "elevated" => "─",
+                                "variable" => "↑",
+                                _          => ""
+                            };
+                            <div class="row text-center g-2">
+                                <div class="col">
+                                    <div class="fs-5 fw-bold">@_metrics.HrEarlyHalfAvg.Value.ToString("F1") bpm</div>
+                                    <div class="text-muted small">HR early-night avg</div>
+                                </div>
+                                <div class="col">
+                                    <div class="fs-5 fw-bold">@_metrics.HrLateHalfAvg.Value.ToString("F1") bpm</div>
+                                    <div class="text-muted small">HR late-night avg</div>
+                                </div>
+                                <div class="col">
+                                    <div class="fs-5 fw-bold @hrShapeColor">@hrShapeSymbol @_metrics.HrShape</div>
+                                    <div class="text-muted small">HR curve shape <a href="/metrics#hr-shape" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="settled↓ = was high, came down | elevated─ = stayed high | calm─ = low all night | variable↑ = rose late">(?)</a></div>
+                                </div>
+                            </div>
+                        }
+                    </details>
                 }
 
-                @* HRV distribution *@
-                @if (_metrics.HrvBelow12Pct.HasValue)
+                @* HRV (open by default) *@
+                @if (_metrics.HrvBelow12Pct.HasValue || _metrics.HrvEarlyHalfAvg.HasValue)
                 {
-                    <div class="mb-2 text-muted small fw-semibold text-uppercase">HRV</div>
-                    <div class="row text-center g-2 mb-3">
-                        <div class="col">
-                            <div class="fs-4 fw-bold text-danger">@_metrics.HrvBelow12Pct.Value.ToString("F1")%</div>
-                            <div class="text-muted small">below 12 ms <a href="/metrics#hrv-dist" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="HRV zones: &lt;12 ms = poor recovery, 12–20 ms = moderate, &gt;20 ms = good. This shows the full distribution">(?)</a></div>
+                    <details open class="mb-3">
+                        <summary class="mb-2 fw-semibold text-uppercase small text-muted" style="cursor:pointer;">HRV</summary>
+                        <div class="row text-center g-2 mt-1 mb-3">
+                            @if (_metrics.HrvBelow12Pct.HasValue)
+                            {
+                                <div class="col">
+                                    <div class="fs-4 fw-bold text-danger">@_metrics.HrvBelow12Pct.Value.ToString("F1")%</div>
+                                    <div class="text-muted small">below 12 ms <a href="/metrics#hrv-dist" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="HRV zones: &lt;12 ms = poor recovery, 12–20 ms = moderate, &gt;20 ms = good. This shows the full distribution">(?)</a></div>
+                                </div>
+                            }
+                            @if (_metrics.Hrv12To20Pct.HasValue)
+                            {
+                                <div class="col">
+                                    <div class="fs-4 fw-bold text-warning">@_metrics.Hrv12To20Pct.Value.ToString("F1")%</div>
+                                    <div class="text-muted small">12–20 ms</div>
+                                </div>
+                            }
+                            @if (_metrics.HrvAbove20Pct.HasValue)
+                            {
+                                <div class="col">
+                                    <div class="fs-4 fw-bold text-success">@_metrics.HrvAbove20Pct.Value.ToString("F1")%</div>
+                                    <div class="text-muted small">above 20 ms</div>
+                                </div>
+                            }
+                            @if (_metrics.HrvPeak.HasValue)
+                            {
+                                <div class="col">
+                                    <div class="fs-4 fw-bold">@_metrics.HrvPeak.Value.ToString("F0") ms</div>
+                                    <div class="text-muted small">HRV peak <a href="/metrics#hrv-peak" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Highest single HRV sample of the night — shows max parasympathetic capacity reached">(?)</a></div>
+                                </div>
+                            }
                         </div>
-                        <div class="col">
-                            <div class="fs-4 fw-bold text-warning">@_metrics.Hrv12To20Pct?.ToString("F1")%</div>
-                            <div class="text-muted small">12–20 ms</div>
-                        </div>
-                        <div class="col">
-                            <div class="fs-4 fw-bold text-success">@_metrics.HrvAbove20Pct?.ToString("F1")%</div>
-                            <div class="text-muted small">above 20 ms</div>
-                        </div>
-                        @if (_metrics.HrvPeak.HasValue)
+                        @if (_metrics.HrvEarlyHalfAvg.HasValue && _metrics.HrvLateHalfAvg.HasValue)
                         {
-                            <div class="col">
-                                <div class="fs-4 fw-bold">@_metrics.HrvPeak.Value.ToString("F0") ms</div>
-                                <div class="text-muted small">HRV peak <a href="/metrics#hrv-peak" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Highest single HRV sample of the night — shows max parasympathetic capacity reached">(?)</a></div>
+                            var dirColor = _metrics.HrvDirection == "improving" ? "text-success" : _metrics.HrvDirection == "declining" ? "text-danger" : "text-muted";
+                            var dirSymbol = _metrics.HrvDirection == "improving" ? "↑" : _metrics.HrvDirection == "declining" ? "↓" : "→";
+                            <div class="row text-center g-2">
+                                <div class="col">
+                                    <div class="fs-5 fw-bold">@_metrics.HrvEarlyHalfAvg.Value.ToString("F1") ms</div>
+                                    <div class="text-muted small">HRV early-night avg</div>
+                                </div>
+                                <div class="col">
+                                    <div class="fs-5 fw-bold">@_metrics.HrvLateHalfAvg.Value.ToString("F1") ms</div>
+                                    <div class="text-muted small">HRV late-night avg</div>
+                                </div>
+                                <div class="col">
+                                    <div class="fs-5 fw-bold @dirColor">@dirSymbol @_metrics.HrvDirection</div>
+                                    <div class="text-muted small">HRV direction <a href="/metrics#hrv-dir" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Trend across the night: improving = late &gt; early by &gt;2 ms. A good night has HRV rising as sleep deepens">(?)</a></div>
+                                </div>
                             </div>
                         }
-                    </div>
-                    @if (_metrics.HrvEarlyHalfAvg.HasValue && _metrics.HrvLateHalfAvg.HasValue)
-                    {
-                        var dirColor = _metrics.HrvDirection == "improving" ? "text-success" : _metrics.HrvDirection == "declining" ? "text-danger" : "text-muted";
-                        var dirSymbol = _metrics.HrvDirection == "improving" ? "↑" : _metrics.HrvDirection == "declining" ? "↓" : "→";
-                        <div class="row text-center g-2 mb-4">
-                            <div class="col">
-                                <div class="fs-5 fw-bold">@_metrics.HrvEarlyHalfAvg.Value.ToString("F1") ms</div>
-                                <div class="text-muted small">HRV early-night avg</div>
-                            </div>
-                            <div class="col">
-                                <div class="fs-5 fw-bold">@_metrics.HrvLateHalfAvg.Value.ToString("F1") ms</div>
-                                <div class="text-muted small">HRV late-night avg</div>
-                            </div>
-                            <div class="col">
-                                <div class="fs-5 fw-bold @dirColor">@dirSymbol @_metrics.HrvDirection</div>
-                                <div class="text-muted small">HRV direction <a href="/metrics#hrv-dir" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Trend across the night: improving = late &gt; early by &gt;2 ms. A good night has HRV rising as sleep deepens">(?)</a></div>
-                            </div>
-                        </div>
-                    }
+                    </details>
                 }
 
-                @* Restorative sleep *@
-                @if (_metrics.RestorativeMinutes.HasValue)
+                @* Sleep Quality (open by default) *@
+                @if (_metrics.RestorativeMinutes.HasValue || _metrics.AwakePctOfBed.HasValue || _detail.Efficiency.HasValue)
                 {
-                    var restColor = _metrics.RestorativeMinutes.Value >= 150 ? "text-success" : _metrics.RestorativeMinutes.Value >= 90 ? "text-warning" : "text-danger";
-                    <div class="row text-center g-2 mb-3">
-                        <div class="col">
-                            <div class="fs-4 fw-bold @restColor">@FmtMin(_metrics.RestorativeMinutes)</div>
-                            <div class="text-muted small">Restorative sleep (Deep + REM) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM combined. Target: ≥150 min = good, ≥90 min = moderate, &lt;90 min = poor">(?)</a></div>
+                    <details open>
+                        <summary class="mb-2 fw-semibold text-uppercase small text-muted" style="cursor:pointer;">Sleep Quality</summary>
+                        <div class="row text-center g-2 mt-1">
+                            @if (_metrics.RestorativeMinutes.HasValue)
+                            {
+                                var restColor = _metrics.RestorativeMinutes.Value >= 150 ? "text-success" : _metrics.RestorativeMinutes.Value >= 90 ? "text-warning" : "text-danger";
+                                <div class="col">
+                                    <div class="fs-4 fw-bold @restColor">@FmtMin(_metrics.RestorativeMinutes)</div>
+                                    <div class="text-muted small">Restorative sleep (Deep + REM) <a href="/metrics#restorative" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Deep + REM combined. Target: ≥150 min = good, ≥90 min = moderate, &lt;90 min = poor">(?)</a></div>
+                                </div>
+                            }
+                            @if (_metrics.AwakePctOfBed.HasValue)
+                            {
+                                var awakePctColor = _metrics.AwakePctOfBed.Value > 20 ? "text-danger" : _metrics.AwakePctOfBed.Value > 10 ? "text-warning" : "text-success";
+                                <div class="col">
+                                    <div class="fs-4 fw-bold @awakePctColor">@_metrics.AwakePctOfBed.Value.ToString("F1")%</div>
+                                    <div class="text-muted small">Awake % of time in bed <a href="/metrics#awake-time" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Duration-independent: &lt;10% = good, 10–20% = moderate, &gt;20% = high fragmentation. More honest than efficiency %">(?)</a></div>
+                                </div>
+                            }
+                            @if (_detail.Efficiency.HasValue)
+                            {
+                                var effColor = _detail.Efficiency.Value >= 90 ? "text-success" : _detail.Efficiency.Value >= 80 ? "text-warning" : "text-danger";
+                                <div class="col">
+                                    <div class="fs-4 fw-bold @effColor">@_detail.Efficiency.Value%</div>
+                                    <div class="text-muted small">Efficiency <a href="/metrics#efficiency" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Sleep ÷ time-in-bed × 100%. 90% on 5h vs 9h is very different — the percentage hides the duration">(?)</a></div>
+                                </div>
+                            }
                         </div>
-                    </div>
+                    </details>
                 }
 
-                @* Awake quality *@
-                @if (_metrics.AwakePctOfBed.HasValue)
-                {
-                    var awakePctColor = _metrics.AwakePctOfBed.Value > 20 ? "text-danger" : _metrics.AwakePctOfBed.Value > 10 ? "text-warning" : "text-success";
-                    <div class="mb-2 text-muted small fw-semibold text-uppercase mt-2">Sleep Quality</div>
-                    <div class="row text-center g-2">
-                        <div class="col">
-                            <div class="fs-4 fw-bold @awakePctColor">@_metrics.AwakePctOfBed.Value.ToString("F1")%</div>
-                            <div class="text-muted small">Awake % of time in bed <a href="/metrics#awake-time" class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Duration-independent: &lt;10% = good, 10–20% = moderate, &gt;20% = high fragmentation. More honest than efficiency %">(?)</a></div>
-                        </div>
-                    </div>
-                }
             </div>
         </div>
     }
 
-    @* ── Daytime context ── *@
-    @if (_detail.Steps.HasValue || _detail.Spo2Average.HasValue
-        || _detail.StressHighSec.HasValue || _detail.ResilienceLevel is not null)
+    @* ── Zone 4: Oura's calculated scores (collapsed) ── *@
+    @if (HasOuraData)
     {
-        <div class="card mb-4">
-            <div class="card-header text-muted small">Daytime context</div>
-            <div class="card-body">
-                <div class="row text-center g-3">
-                    @foreach (var item in GetDaytimeItems(_detail))
+        <details class="mb-3">
+            <summary class="btn btn-sm btn-outline-secondary mb-3" style="cursor:pointer; display:list-item; list-style:none;">Oura's calculated scores</summary>
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="row text-center mb-3 g-2">
+                        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.SleepScore)</div><div class="text-muted small">Sleep score</div></div>
+                        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.ReadinessScore)</div><div class="text-muted small">Readiness</div></div>
+                        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.AverageHrv)</div><div class="text-muted small">HRV avg (ms)</div></div>
+                        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageHeartRate)</div><div class="text-muted small">Avg HR (bpm)</div></div>
+                        <div class="col"><div class="fs-3 fw-bold">@Fmt(_detail.LowestHeartRate)</div><div class="text-muted small">Lowest HR</div></div>
+                        <div class="col"><div class="fs-3 fw-bold">@FmtD(_detail.AverageBreath)</div><div class="text-muted small">Resp (brpm)</div></div>
+                        <div class="col"><div class="fs-3 fw-bold">@FmtTemp(_detail.TempDeviation)</div><div class="text-muted small">Temp dev</div></div>
+                    </div>
+                    <div class="row text-center mb-3 g-2">
+                        <div class="col"><div class="fs-5 fw-bold">@Fmt(_detail.DeepMinutes)</div><div class="text-muted small">Deep (min)</div></div>
+                        <div class="col"><div class="fs-5 fw-bold">@Fmt(_detail.RemMinutes)</div><div class="text-muted small">REM (min)</div></div>
+                        <div class="col"><div class="fs-5 fw-bold">@Fmt(_detail.AwakeMinutes)</div><div class="text-muted small">Awake (min)</div></div>
+                        @if (_detail.BedtimeStart.HasValue && _detail.BedtimeEnd.HasValue)
+                        {
+                            <div class="col">
+                                <div class="fs-5 fw-bold">@_detail.BedtimeStart.Value.ToLocalTime().ToString("HH:mm") – @_detail.BedtimeEnd.Value.ToLocalTime().ToString("HH:mm")</div>
+                                <div class="text-muted small">Bedtime window</div>
+                            </div>
+                        }
+                        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TotalSleepMinutes)</div><div class="text-muted small">Total sleep</div></div>
+                        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LightSleepMinutes)</div><div class="text-muted small">Light (min)</div></div>
+                        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.TimeInBedMinutes)</div><div class="text-muted small">Time in bed</div></div>
+                        <div class="col"><div class="fs-5 fw-bold">@FmtMin(_detail.LatencyMinutes)</div><div class="text-muted small">Sleep latency</div></div>
+                        <div class="col"><div class="fs-5 fw-bold">@(_detail.RestlessPeriods?.ToString() ?? "—")</div><div class="text-muted small">Restless periods</div></div>
+                        @if (_detail.TempTrendDeviation.HasValue)
+                        {
+                            <div class="col">
+                                <div class="fs-5 fw-bold @(_detail.TempTrendDeviation >= 0 ? "text-warning" : "text-info")">@((_detail.TempTrendDeviation >= 0 ? "+" : "") + _detail.TempTrendDeviation.Value.ToString("F2")) °C</div>
+                                <div class="text-muted small">Temp trend</div>
+                            </div>
+                        }
+                    </div>
+                    @if (_detail.SleepDeepContributor.HasValue || _detail.SleepEfficiencyContributor.HasValue)
                     {
-                        <div class="col-6 col-md-3">
-                            <div class="fs-5 fw-bold">@item.Value</div>
-                            <div class="text-muted small">@item.Label</div>
+                        <div class="mb-2 text-muted small fw-semibold">Sleep contributors</div>
+                        <div class="row g-2 mb-3">
+                            @foreach (var c in GetSleepContribItems(_detail))
+                            {
+                                <div class="col-auto">
+                                    <div class="border rounded text-center px-2 py-1">
+                                        <div class="fw-bold">@c.Value</div>
+                                        <div class="text-muted" style="font-size:0.72rem">@c.Label</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    @if (_detail.ReadinessHrvBalance.HasValue || _detail.ReadinessRhr.HasValue)
+                    {
+                        <div class="mb-2 text-muted small fw-semibold">Readiness contributors</div>
+                        <div class="row g-2">
+                            @foreach (var c in GetReadinessContribItems(_detail))
+                            {
+                                <div class="col-auto">
+                                    <div class="border rounded text-center px-2 py-1">
+                                        <div class="fw-bold">@c.Value</div>
+                                        <div class="text-muted" style="font-size:0.72rem">@c.Label</div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
             </div>
-        </div>
+        </details>
     }
 
-    @* ── Score contributors ── *@
-    @if (_detail.SleepDeepContributor.HasValue || _detail.SleepEfficiencyContributor.HasValue
-        || _detail.ReadinessHrvBalance.HasValue || _detail.ReadinessRhr.HasValue)
+    @* ── Zone 5: Daytime context (collapsed) ── *@
+    @if (_detail.Steps.HasValue || _detail.Spo2Average.HasValue
+        || _detail.StressHighSec.HasValue || _detail.ResilienceLevel is not null)
     {
-        <div class="card mb-4">
-            <div class="card-header text-muted small">Score contributors (0–100)</div>
-            <div class="card-body">
-                @if (_detail.SleepDeepContributor.HasValue || _detail.SleepEfficiencyContributor.HasValue)
-                {
-                    <div class="mb-2 text-muted small fw-semibold">Sleep</div>
-                    <div class="row g-2 mb-3">
-                        @foreach (var c in GetSleepContribItems(_detail))
+        <details class="mb-3">
+            <summary class="btn btn-sm btn-outline-secondary mb-3" style="cursor:pointer; display:list-item; list-style:none;">Daytime context</summary>
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="row text-center g-3">
+                        @foreach (var item in GetDaytimeItems(_detail))
                         {
-                            <div class="col-auto">
-                                <div class="border rounded text-center px-2 py-1">
-                                    <div class="fw-bold">@c.Value</div>
-                                    <div class="text-muted" style="font-size:0.72rem">@c.Label</div>
-                                </div>
+                            <div class="col-6 col-md-3">
+                                <div class="fs-5 fw-bold">@item.Value</div>
+                                <div class="text-muted small">@item.Label</div>
                             </div>
                         }
                     </div>
-                }
-                @if (_detail.ReadinessHrvBalance.HasValue || _detail.ReadinessRhr.HasValue)
-                {
-                    <div class="mb-2 text-muted small fw-semibold">Readiness</div>
-                    <div class="row g-2">
-                        @foreach (var c in GetReadinessContribItems(_detail))
-                        {
-                            <div class="col-auto">
-                                <div class="border rounded text-center px-2 py-1">
-                                    <div class="fw-bold">@c.Value</div>
-                                    <div class="text-muted" style="font-size:0.72rem">@c.Label</div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
+                </div>
+            </div>
+        </details>
+    }
+
+    @* ── Zone 6: Raw data (collapsed) ── *@
+    <details class="mb-3">
+        <summary class="btn btn-sm btn-outline-secondary mb-3" style="cursor:pointer; display:list-item; list-style:none;">Raw data — copy to LLM</summary>
+        <div class="card">
+            <div class="card-body p-2 d-flex flex-column gap-2">
+                <button class="btn btn-sm btn-outline-primary align-self-end" @onclick="CopyToClipboard">Copy</button>
+                <textarea @ref="_textareaRef" class="form-control font-monospace" style="font-size:0.78rem" rows="18" readonly>@_llmText</textarea>
             </div>
         </div>
-    }
-
-    @* ── LLM text export ── *@
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span class="fw-semibold">Raw data — copy to LLM</span>
-            <button class="btn btn-sm btn-outline-primary" @onclick="CopyToClipboard">Copy</button>
-        </div>
-        <div class="card-body p-2">
-            <textarea @ref="_textareaRef" class="form-control font-monospace" style="font-size:0.78rem" rows="18" readonly>@_llmText</textarea>
-        </div>
-    </div>
+    </details>
 }
 
 @code {
@@ -383,6 +421,17 @@ else
     private ApexChartOptions<SamplePoint> _hrvOpts = null!;
     private ApexChartOptions<SamplePoint> _hrOpts  = null!;
     private ElementReference _textareaRef;
+
+    private int?   RrsVal    => _metrics?.RealRecoveryScore;
+    private string VerdictBg => RrsVal.HasValue
+        ? RrsVal.Value >= 75 ? "bg-success text-white"
+        : RrsVal.Value >= 50 ? "bg-warning text-dark"
+        : "bg-danger text-white"
+        : "bg-secondary text-white";
+    private string Summary   => _metrics is not null ? GenerateSummary(_detail!, _metrics) : string.Empty;
+    private bool   HasOuraData => _detail is not null && (_detail.SleepScore.HasValue
+        || _detail.ReadinessScore.HasValue || _detail.AverageHrv.HasValue
+        || _detail.SleepDeepContributor.HasValue || _detail.ReadinessHrvBalance.HasValue);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -699,5 +748,49 @@ else
         if (d.ReadinessRecoveryIndex.HasValue)    yield return ("Recovery index",   d.ReadinessRecoveryIndex);
         if (d.ReadinessRhr.HasValue)              yield return ("Resting HR",       d.ReadinessRhr);
         if (d.ReadinessSleepBalance.HasValue)     yield return ("Sleep balance",    d.ReadinessSleepBalance);
+    }
+
+    private static string GenerateSummary(NightData d, NightMetrics m)
+    {
+        var rrs = m.RealRecoveryScore;
+        if (!rrs.HasValue) return string.Empty;
+
+        if (rrs.Value >= 75)
+        {
+            if (m.HrvDirection == "improving" && m.HrSettlingMinutes is <= 30)
+                return "Strong night — HRV improving all night, HR fully settled within 30 min.";
+            if (m.HrvDirection == "improving")
+                return "Strong night — HRV trended upward through the night.";
+            if (m.HrShape == "calm")
+                return "Strong night — HR calm from the start, good parasympathetic tone.";
+            if (m.RestorativeMinutes is >= 150)
+                return $"Strong night — {m.RestorativeMinutes} min of restorative sleep.";
+            return "Strong recovery across all metrics.";
+        }
+
+        if (rrs.Value >= 50)
+        {
+            if (m.HrAbove75Pct is > 40)
+                return $"Moderate recovery — HR elevated for {m.HrAbove75Pct.Value:F0}% of the night.";
+            if (m.HrvDirection == "declining")
+                return "Moderate recovery — HRV declined through the second half of the night.";
+            if (m.RestorativeMinutes is < 90)
+                return $"Moderate recovery — only {m.RestorativeMinutes} min of restorative sleep.";
+            return "Moderate recovery night.";
+        }
+
+        // RRS < 50
+        if (m.HrAbove75Pct is > 50)
+        {
+            var suffix = d.TempDeviation is > 0.3
+                ? $" — temp elevated ({d.TempDeviation.Value:+F2}°C)."
+                : ".";
+            return $"Elevated HR for {m.HrAbove75Pct.Value:F0}% of the night{suffix}";
+        }
+        if (m.HrvBelow12Pct is > 50)
+            return $"Poor HRV night — {m.HrvBelow12Pct.Value:F0}% of samples below 12 ms.";
+        if (m.RestorativeMinutes is < 60)
+            return "Poor restorative sleep — check for sleep fragmentation.";
+        return "Difficult night — recovery was poor across multiple metrics.";
     }
 }
