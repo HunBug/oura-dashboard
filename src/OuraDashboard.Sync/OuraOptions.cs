@@ -11,6 +11,9 @@ public class OuraOptions
 
     /// <summary>How many days back to fetch on each scheduled/background sync run. Default: 2.</summary>
     public int SyncLookbackDays { get; set; } = 2;
+
+    /// <summary>How many days back to fetch when a full/historical sync is requested. Default: 90.</summary>
+    public int FullSyncLookbackDays { get; set; } = 90;
 }
 
 public class OuraUserConfig

@@ -16,8 +16,9 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
     private readonly IOptions<OuraOptions> _options;
     private readonly ILogger<SyncBackgroundService> _logger;
 
-    // Bounded channel: capacity 1 means a second "refresh" click while one is queued does nothing
-    private readonly Channel<bool> _triggerChannel = Channel.CreateBounded<bool>(
+    // Bounded channel: capacity 1 means a second "refresh" click while one is queued does nothing.
+    // The value is the number of days to look back (SyncLookbackDays for normal, FullSyncLookbackDays for full).
+    private readonly Channel<int> _triggerChannel = Channel.CreateBounded<int>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite });
 
     private readonly SyncState _state = new();
@@ -37,7 +38,13 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
     public bool RequestSync()
     {
         if (_state.IsRunning) return false;
-        return _triggerChannel.Writer.TryWrite(true);
+        return _triggerChannel.Writer.TryWrite(_options.Value.SyncLookbackDays);
+    }
+
+    public bool RequestFullSync()
+    {
+        if (_state.IsRunning) return false;
+        return _triggerChannel.Writer.TryWrite(_options.Value.FullSyncLookbackDays);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -48,18 +55,19 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
         var interval = TimeSpan.FromMinutes(_options.Value.SyncIntervalMinutes);
 
         // Run once on startup
-        await RunSyncAsync(stoppingToken);
+        await RunSyncAsync(_options.Value.SyncLookbackDays, stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             cts.CancelAfter(interval);
 
+            int days = _options.Value.SyncLookbackDays;
             try
             {
                 // Wait until either the timer fires or a manual trigger arrives
-                await _triggerChannel.Reader.ReadAsync(cts.Token);
-                _logger.LogInformation("Manual sync triggered via UI");
+                days = await _triggerChannel.Reader.ReadAsync(cts.Token);
+                _logger.LogInformation("Manual sync triggered via UI ({Days} days)", days);
             }
             catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
             {
@@ -68,11 +76,11 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
             }
 
             if (!stoppingToken.IsCancellationRequested)
-                await RunSyncAsync(stoppingToken);
+                await RunSyncAsync(days, stoppingToken);
         }
     }
 
-    private async Task RunSyncAsync(CancellationToken ct)
+    private async Task RunSyncAsync(int days, CancellationToken ct)
     {
         _state.IsRunning = true;
         _state.LastResults = [];
@@ -88,7 +96,7 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
             foreach (var userConfig in options.Users)
             {
                 var result = await syncService.SyncUserAsync(
-                    userConfig.Name, options.SyncLookbackDays, ct);
+                    userConfig.Name, days, ct);
 
                 results.Add(result);
                 _state.LastErrors.AddRange(result.Errors);

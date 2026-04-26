@@ -8,6 +8,9 @@ public interface ISyncTrigger
     /// <summary>Request an immediate out-of-schedule sync. Returns false if a sync is already running.</summary>
     bool RequestSync();
 
+    /// <summary>Request a full historical sync using FullSyncLookbackDays. Returns false if a sync is already running.</summary>
+    bool RequestFullSync();
+
     /// <summary>Current sync state, readable by UI components.</summary>
     SyncState State { get; }
 }

@@ -8,7 +8,7 @@
 
 <h1>Sync</h1>
 
-<div class="mb-3">
+<div class="mb-3 d-flex gap-2">
     <button class="btn btn-primary" @onclick="RequestSync" disabled="@_state.IsRunning">
         @if (_state.IsRunning)
         {
@@ -19,6 +19,10 @@
         {
             <span>Refresh now</span>
         }
+    </button>
+    <button class="btn btn-warning" @onclick="RequestFullSync" disabled="@_state.IsRunning"
+            title="Fetches the full FullSyncLookbackDays window (default 90 days) for all users">
+        Full reload (90 days)
     </button>
 </div>
 
@@ -101,6 +105,12 @@
     private void RequestSync()
     {
         SyncTrigger.RequestSync();
+        _state = SyncTrigger.State;
+    }
+
+    private void RequestFullSync()
+    {
+        SyncTrigger.RequestFullSync();
         _state = SyncTrigger.State;
     }
 
