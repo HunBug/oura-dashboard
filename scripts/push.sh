@@ -12,7 +12,7 @@
 #
 # Configurable env vars (all have defaults):
 #   REGISTRY            Docker registry host:port        (default: lara:5000)
-#   LARA_URL            lara API base URL                (default: http://lara:8080)
+#   LARA_URL            lara API base URL                (default: http://lara:1234)
 #   LARA_DEPLOY_PATH    lara deploy API path             (default: /api/deploy/oura-dashboard)
 #   WEB_URL             URL to health-check after deploy (default: http://lara:8085)
 
@@ -24,7 +24,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # ─── Defaults ─────────────────────────────────────────────────────────────────
 REGISTRY="${REGISTRY:-lara:5000}"
 IMAGE_NAME="oura-dashboard"
-LARA_URL="${LARA_URL:-http://lara:8080}"
+LARA_URL="${LARA_URL:-http://lara:1234}"
 LARA_DEPLOY_PATH="${LARA_DEPLOY_PATH:-/api/deploy/oura-dashboard}"
 WEB_URL="${WEB_URL:-http://lara:8085}"
 VERSION_FILE="${REPO_ROOT}/Directory.Build.props"
@@ -105,11 +105,11 @@ info "Docker daemon is running"
 
 # ─── 4. Registry reachable? ───────────────────────────────────────────────────
 if [[ "$DRY_RUN" == false ]]; then
-  REGISTRY_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    "http://${REGISTRY}/v2/" 2>/dev/null || echo "000")
+  REGISTRY_HTTP=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 5 \
+    "https://${REGISTRY}/v2/" 2>/dev/null || echo "000")
   # 200 = anonymous OK, 401 = auth required (still reachable)
   [[ "$REGISTRY_HTTP" == "200" || "$REGISTRY_HTTP" == "401" ]] || \
-    abort "Registry http://${REGISTRY}/v2/ returned HTTP ${REGISTRY_HTTP}.\n  Is the registry running on lara?"
+    abort "Registry https://${REGISTRY}/v2/ returned HTTP ${REGISTRY_HTTP}.\n  Is the registry running on lara?"
   info "Registry reachable (HTTP ${REGISTRY_HTTP})"
 else
   warn "[dry-run] Skipping registry reachability check"
@@ -117,8 +117,8 @@ fi
 
 # ─── 5. Version tag already exists? ──────────────────────────────────────────
 if [[ "$DRY_RUN" == false ]]; then
-  MANIFEST_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    "http://${REGISTRY}/v2/${IMAGE_NAME}/manifests/${VERSION}" 2>/dev/null || echo "000")
+  MANIFEST_HTTP=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 5 \
+    "https://${REGISTRY}/v2/${IMAGE_NAME}/manifests/${VERSION}" 2>/dev/null || echo "000")
 
   if [[ "$MANIFEST_HTTP" == "200" ]]; then
     if [[ "$FORCE" == true ]]; then
