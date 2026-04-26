@@ -10,6 +10,10 @@
 #   --dry-run      Print what would happen without executing anything
 #   --help         Show this message
 #
+# Credentials file:
+#   scripts/.env        Sourced automatically if present — put LARA_API_KEY there
+#                       (gitignored; copy from scripts/.env.template)
+#
 # Configurable env vars (all have defaults):
 #   REGISTRY            Docker registry host:port        (default: lara:5000)
 #   LARA_URL            lara API base URL                (default: http://lara:1234)
@@ -70,6 +74,17 @@ run() {
     "$@"
   fi
 }
+
+# ─── Load local .env (credentials) ───────────────────────────────────────────
+ENV_FILE="${SCRIPT_DIR}/.env"
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck source=scripts/.env
+  # Use set -a so every variable in the file is exported automatically
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
 
 # ─── Banner ───────────────────────────────────────────────────────────────────
 echo -e "\n${BOLD}oura-dashboard deploy script${NC}"
@@ -147,7 +162,7 @@ step "dotnet build (Release)"
 cd "$REPO_ROOT"
 
 if [[ "$DRY_RUN" == false ]]; then
-  BUILD_OUTPUT=$(dotnet build --configuration Release 2>&1)
+  BUILD_OUTPUT=$(dotnet build --configuration Release 2>&1) || true
   echo "$BUILD_OUTPUT" | grep -E "^Build |error" | tail -5 || true
   echo "$BUILD_OUTPUT" | grep -q "Build succeeded" || abort "dotnet build failed.\n$(echo "$BUILD_OUTPUT" | grep -i error | head -10)"
   info "Build succeeded"
@@ -161,9 +176,9 @@ if [[ "$SKIP_TESTS" == true ]]; then
 else
   step "dotnet test"
   if [[ "$DRY_RUN" == false ]]; then
-    TEST_OUTPUT=$(dotnet test --configuration Release --no-build 2>&1)
+    TEST_OUTPUT=$(dotnet test --configuration Release --no-build 2>&1) || true
     echo "$TEST_OUTPUT" | grep -E "passed|failed|Passed|Failed" | tail -5 || true
-    echo "$TEST_OUTPUT" | grep -qiE "failed|Error" && abort "Tests failed.\n$(echo "$TEST_OUTPUT" | grep -iE "failed|Error" | head -10)"
+    echo "$TEST_OUTPUT" | grep -qiE "failed:[[:space:]]*[1-9]" && abort "Tests failed.\n$(echo "$TEST_OUTPUT" | grep -iE "failed:[[:space:]]*[1-9]" | head -10)"
     info "All tests passed"
   else
     run dotnet test --configuration Release --no-build

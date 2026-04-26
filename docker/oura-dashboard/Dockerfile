@@ -18,7 +18,6 @@ COPY src/ src/
 ARG VERSION=1.0.0
 RUN dotnet publish src/OuraDashboard.Web/OuraDashboard.Web.csproj \
     --configuration Release \
-    --no-restore \
     --output /app/publish \
     -p:Version="$VERSION" \
     -p:UseAppHost=false
@@ -27,11 +26,10 @@ RUN dotnet publish src/OuraDashboard.Web/OuraDashboard.Web.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Don't run as root
-RUN adduser --disabled-password --gecos "" appuser
-USER appuser
+# Use the built-in non-root user that ships with the .NET runtime image
+USER app
 
-COPY --from=build --chown=appuser:appuser /app/publish .
+COPY --from=build --chown=app:app /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:8085
 ENV ASPNETCORE_ENVIRONMENT=Production
