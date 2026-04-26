@@ -3,6 +3,7 @@
 
 @inject DashboardQueryService Query
 @inject IJSRuntime JS
+@inject IOptions<OuraOptions> OuraOptions
 
 <PageTitle>@UserName — @DayStr</PageTitle>
 
@@ -95,7 +96,7 @@ else
                 <ApexChart TItem="SamplePoint" Options="_hrvOpts" Height="200">
                     <ApexPointSeries TItem="SamplePoint" Items="_detail.HrvSeries" Name="HRV (ms)"
                         SeriesType="SeriesType.Line"
-                        XValue="p => DateTime.SpecifyKind(p.Time.LocalDateTime, DateTimeKind.Utc)"
+                        XValue="p => ChartDateTime(p.Time)"
                         YValue="p => (decimal?)p.Value" />
                 </ApexChart>
             </div>
@@ -111,7 +112,7 @@ else
                 <ApexChart TItem="SamplePoint" Options="_hrOpts" Height="200">
                     <ApexPointSeries TItem="SamplePoint" Items="_detail.HeartRateSeries" Name="HR (bpm)"
                         SeriesType="SeriesType.Line"
-                        XValue="p => DateTime.SpecifyKind(p.Time.LocalDateTime, DateTimeKind.Utc)"
+                        XValue="p => ChartDateTime(p.Time)"
                         YValue="p => (decimal?)p.Value" />
                 </ApexChart>
             </div>
@@ -322,7 +323,7 @@ else
                         @if (_detail.BedtimeStart.HasValue && _detail.BedtimeEnd.HasValue)
                         {
                             <div class="col">
-                                <div class="fs-5 fw-bold">@_detail.BedtimeStart.Value.ToLocalTime().ToString("HH:mm") – @_detail.BedtimeEnd.Value.ToLocalTime().ToString("HH:mm")</div>
+                                <div class="fs-5 fw-bold">@FormatTime(_detail.BedtimeStart.Value) – @FormatTime(_detail.BedtimeEnd.Value)</div>
                                 <div class="text-muted small">Bedtime window</div>
                             </div>
                         }
@@ -401,7 +402,13 @@ else
         <summary class="btn btn-sm btn-outline-secondary mb-3" style="cursor:pointer; display:list-item; list-style:none;">Raw data — copy to LLM</summary>
         <div class="card">
             <div class="card-body p-2 d-flex flex-column gap-2">
-                <button class="btn btn-sm btn-outline-primary align-self-end" @onclick="CopyToClipboard">Copy</button>
+                <div class="d-flex justify-content-end align-items-center gap-2">
+                    @if (_copyStatus is not null)
+                    {
+                        <span class="small text-muted">@_copyStatus</span>
+                    }
+                    <button class="btn btn-sm btn-outline-primary" @onclick="CopyToClipboard">Copy</button>
+                </div>
                 <textarea @ref="_textareaRef" class="form-control font-monospace" style="font-size:0.78rem" rows="18" readonly>@_llmText</textarea>
             </div>
         </div>
@@ -421,6 +428,8 @@ else
     private ApexChartOptions<SamplePoint> _hrvOpts = null!;
     private ApexChartOptions<SamplePoint> _hrOpts  = null!;
     private ElementReference _textareaRef;
+    private string? _copyStatus;
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
 
     private int?   RrsVal    => _metrics?.RealRecoveryScore;
     private string VerdictBg => RrsVal.HasValue
@@ -432,6 +441,11 @@ else
     private bool   HasOuraData => _detail is not null && (_detail.SleepScore.HasValue
         || _detail.ReadinessScore.HasValue || _detail.AverageHrv.HasValue
         || _detail.SleepDeepContributor.HasValue || _detail.ReadinessHrvBalance.HasValue);
+
+    protected override void OnInitialized()
+    {
+        _displayTimeZone = OuraTimeZone.Resolve(OuraOptions.Value.DisplayTimeZoneId);
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -521,21 +535,21 @@ else
         // X-axis range and bedtime annotations (for both charts)
         if (_detail?.BedtimeStart.HasValue == true && _detail.BedtimeEnd.HasValue == true)
         {
-            var xMin = ChartMs(_detail.BedtimeStart.Value.AddHours(-1));
-            var xMax = ChartMs(_detail.BedtimeEnd.Value.AddHours(1));
+            var xMin = ChartMs(_detail.BedtimeStart.Value.AddHours(-1), _displayTimeZone);
+            var xMax = ChartMs(_detail.BedtimeEnd.Value.AddHours(1), _displayTimeZone);
 
             var bedAnnotations = new List<AnnotationsXAxis>
             {
                 new AnnotationsXAxis
                 {
-                    X           = ChartMs(_detail.BedtimeStart.Value),
+                    X           = ChartMs(_detail.BedtimeStart.Value, _displayTimeZone),
                     BorderColor = "#2d3436",
                     BorderWidth = 2,
                     Label       = new Label { Text = "Sleep", Style = new Style { Background = "#2d3436", Color = "#fff", FontSize = "10px" } },
                 },
                 new AnnotationsXAxis
                 {
-                    X           = ChartMs(_detail.BedtimeEnd.Value),
+                    X           = ChartMs(_detail.BedtimeEnd.Value, _displayTimeZone),
                     BorderColor = "#6c5ce7",
                     BorderWidth = 2,
                     Label       = new Label { Text = "Wake", Style = new Style { Background = "#6c5ce7", Color = "#fff", FontSize = "10px" } },
@@ -551,7 +565,8 @@ else
         if (_detail is not null)
         {
             _metrics = NightMetricsCalculator.Compute(_detail);
-            _llmText  = BuildLlmText(_detail);
+            _llmText  = BuildLlmText(_detail, _displayTimeZone);
+            _copyStatus = null;
         }
 
         _loading = false;
@@ -565,16 +580,30 @@ else
 
     private async Task CopyToClipboard()
     {
-        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _llmText);
+        try
+        {
+            var copied = await JS.InvokeAsync<bool>("copyTextToClipboard", _llmText, _textareaRef);
+            _copyStatus = copied ? "Copied." : "Copy failed; select the text manually.";
+        }
+        catch (JSException ex)
+        {
+            _copyStatus = $"Copy failed: {ex.Message}";
+        }
     }
 
     // Encode a DateTimeOffset as "local wall-clock time treated as UTC" so ApexCharts
     // (which runs in datetimeUTC mode) displays the correct local HH:mm labels.
-    private static long ChartMs(DateTimeOffset dto) =>
-        new DateTimeOffset(DateTime.SpecifyKind(dto.ToLocalTime().DateTime, DateTimeKind.Utc))
+    private static long ChartMs(DateTimeOffset dto, TimeZoneInfo timeZone) =>
+        new DateTimeOffset(DateTime.SpecifyKind(TimeZoneInfo.ConvertTime(dto, timeZone).DateTime, DateTimeKind.Utc))
             .ToUnixTimeMilliseconds();
 
-    private static string BuildLlmText(NightData d)
+    private DateTime ChartDateTime(DateTimeOffset dto) =>
+        DateTime.SpecifyKind(TimeZoneInfo.ConvertTime(dto, _displayTimeZone).DateTime, DateTimeKind.Utc);
+
+    private string FormatTime(DateTimeOffset dto) =>
+        TimeZoneInfo.ConvertTime(dto, _displayTimeZone).ToString("HH:mm");
+
+    private static string BuildLlmText(NightData d, TimeZoneInfo timeZone)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"=== Oura Night Data: {d.UserName}, {d.Day:yyyy-MM-dd} ({d.Day:dddd}) ===");
@@ -583,7 +612,7 @@ else
         if (d.BedtimeStart.HasValue && d.BedtimeEnd.HasValue)
         {
             sb.AppendLine("SLEEP WINDOW");
-            sb.AppendLine($"  Bedtime      : {d.BedtimeStart.Value.ToLocalTime():HH:mm} – {d.BedtimeEnd.Value.ToLocalTime():HH:mm}");
+            sb.AppendLine($"  Bedtime      : {TimeZoneInfo.ConvertTime(d.BedtimeStart.Value, timeZone):HH:mm} – {TimeZoneInfo.ConvertTime(d.BedtimeEnd.Value, timeZone):HH:mm}");
             sb.AppendLine();
         }
 
@@ -670,7 +699,7 @@ else
             sb.AppendLine("INTRA-NIGHT HRV (5-min intervals, ms — null = no signal)");
             sb.Append("  ");
             sb.AppendLine(string.Join(", ", d.HrvSeries.Select(p =>
-                $"{p.Time.ToLocalTime():HH:mm}={p.Value?.ToString("F0") ?? "null"}")));
+                $"{TimeZoneInfo.ConvertTime(p.Time, timeZone):HH:mm}={p.Value?.ToString("F0") ?? "null"}")));
         }
 
         if (d.HeartRateSeries.Count > 0)
@@ -679,7 +708,7 @@ else
             sb.AppendLine("INTRA-NIGHT HEART RATE (5-min intervals, bpm — null = no signal)");
             sb.Append("  ");
             sb.AppendLine(string.Join(", ", d.HeartRateSeries.Select(p =>
-                $"{p.Time.ToLocalTime():HH:mm}={p.Value?.ToString("F0") ?? "null"}")));
+                $"{TimeZoneInfo.ConvertTime(p.Time, timeZone):HH:mm}={p.Value?.ToString("F0") ?? "null"}")));
         }
 
         return sb.ToString();

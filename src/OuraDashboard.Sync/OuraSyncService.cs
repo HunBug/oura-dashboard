@@ -39,7 +39,7 @@ public class OuraSyncService(
     public async Task<SyncResult> SyncUserAsync(
         string userName, int days, CancellationToken ct = default)
     {
-        var end = DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = OuraTimeZone.Today(options.Value.DisplayTimeZoneId);
         var start = end.AddDays(-(days - 1));
         var errors = new List<string>();
 

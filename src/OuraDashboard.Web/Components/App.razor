@@ -31,6 +31,32 @@
                 bootstrap.Popover.getOrCreateInstance(el);
             });
         }
+        async function copyTextToClipboard(text, fallbackElement) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+
+            if (fallbackElement) {
+                fallbackElement.focus();
+                fallbackElement.select();
+                return document.execCommand('copy');
+            }
+
+            const el = document.createElement('textarea');
+            el.value = text;
+            el.setAttribute('readonly', '');
+            el.style.position = 'fixed';
+            el.style.left = '-9999px';
+            document.body.appendChild(el);
+            el.focus();
+            el.select();
+            try {
+                return document.execCommand('copy');
+            } finally {
+                document.body.removeChild(el);
+            }
+        }
         // Re-init after Blazor enhanced navigation replaces DOM content.
         document.addEventListener('DOMContentLoaded', function () { initPopovers(); initTooltips(); });
     </script>

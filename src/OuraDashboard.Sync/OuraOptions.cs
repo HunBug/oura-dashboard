@@ -14,6 +14,9 @@ public class OuraOptions
 
     /// <summary>How many days back to fetch when a full/historical sync is requested. Default: 90.</summary>
     public int FullSyncLookbackDays { get; set; } = 90;
+
+    /// <summary>Timezone used for Oura day boundaries and wall-clock display.</summary>
+    public string DisplayTimeZoneId { get; set; } = "Europe/Tallinn";
 }
 
 public class OuraUserConfig

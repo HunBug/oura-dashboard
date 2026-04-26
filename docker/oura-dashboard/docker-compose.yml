@@ -36,6 +36,8 @@ services:
 
       # Background sync interval in minutes (default 60)
       Oura__SyncIntervalMinutes: "${OURA_SYNC_INTERVAL_MINUTES:-60}"
+      Oura__DisplayTimeZoneId: "Europe/Tallinn"
+      TZ: "Europe/Tallinn"
     depends_on:
       postgres:
         condition: service_healthy

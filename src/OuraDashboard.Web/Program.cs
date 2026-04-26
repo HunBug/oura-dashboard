@@ -15,6 +15,7 @@ builder.Services.AddOuraDatabase(builder.Configuration.GetConnectionString("Defa
 builder.Services.AddOuraSync(addBackgroundService: true);
 builder.Services.AddApexCharts();
 builder.Services.AddScoped<OuraDashboard.Web.Services.DashboardQueryService>();
+builder.Services.AddScoped<OuraDashboard.Web.Services.DebugInvestigationService>();
 
 var app = builder.Build();
 

@@ -1,0 +1,143 @@
+@page "/debug/investigate"
+@rendermode InteractiveServer
+
+@inject DebugInvestigationService DebugService
+
+<PageTitle>Debug Investigate</PageTitle>
+
+<h4 class="mb-3">Debug Investigate</h4>
+
+<div class="row g-3 align-items-end mb-4">
+    <div class="col-auto">
+        <label class="form-label small">User</label>
+        <select class="form-select form-select-sm" @bind="_user">
+            <option value="Boo">Boo</option>
+            <option value="Maa">Maa</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label small">Oura day</label>
+        <input type="date" class="form-control form-control-sm" @bind="_day" />
+    </div>
+    <div class="col-auto d-flex gap-2">
+        <button class="btn btn-sm btn-primary" @onclick="LoadStoredAsync" disabled="@_loadingStored">
+            @if (_loadingStored) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+            DB rows
+        </button>
+        <button class="btn btn-sm btn-outline-primary" @onclick="FetchLiveAsync" disabled="@_loadingLive">
+            @if (_loadingLive) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+            Fetch Oura live
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAllAsync" disabled="@(_loadingStored || _loadingLive)">
+            Load both
+        </button>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger small">@_error</div>
+}
+
+<div class="row g-4">
+    <div class="col-12 col-xl-6">
+        <h5 class="mb-2">Stored DB Data</h5>
+        @if (_storedRows is null)
+        {
+            <p class="text-muted small">No DB data loaded.</p>
+        }
+        else if (_storedRows.Count == 0)
+        {
+            <div class="alert alert-warning small">No stored DB rows found for @_user on @DayOnly.</div>
+        }
+        else
+        {
+            @foreach (var row in _storedRows)
+            {
+                <details class="mb-3" open="@(row.Endpoint == "sleep")">
+                    <summary class="fw-semibold">@row.Endpoint <span class="text-muted fw-normal small">@row.Key</span></summary>
+                    <div class="small text-muted my-2">@row.Extracted</div>
+                    <textarea class="form-control font-monospace bg-body-secondary" rows="14" readonly>@row.RawJson</textarea>
+                </details>
+            }
+        }
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <h5 class="mb-2">Live Oura Fetch</h5>
+        @if (_liveRows is null)
+        {
+            <p class="text-muted small">No live Oura data loaded.</p>
+        }
+        else
+        {
+            @foreach (var row in _liveRows)
+            {
+                <details class="mb-3" open="@(row.Endpoint == "sleep")">
+                    <summary class="fw-semibold">@row.Endpoint <span class="text-muted fw-normal small">@row.Status</span></summary>
+                    <div class="small text-muted my-2">@row.Request</div>
+                    <textarea class="form-control font-monospace bg-body-secondary" rows="14" readonly>@row.RawJson</textarea>
+                </details>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private string _user = "Boo";
+    private DateTime _day;
+    private bool _loadingStored;
+    private bool _loadingLive;
+    private string? _error;
+    private List<DbDebugRow>? _storedRows;
+    private List<LiveOuraDebugRow>? _liveRows;
+
+    private DateOnly DayOnly => DateOnly.FromDateTime(_day);
+
+    protected override void OnInitialized()
+    {
+        _day = DebugService.Today().ToDateTime(TimeOnly.MinValue);
+    }
+
+    private async Task LoadAllAsync()
+    {
+        await LoadStoredAsync();
+        await FetchLiveAsync();
+    }
+
+    private async Task LoadStoredAsync()
+    {
+        _error = null;
+        _loadingStored = true;
+        try
+        {
+            _storedRows = await DebugService.GetStoredRowsAsync(_user, DayOnly);
+        }
+        catch (Exception ex)
+        {
+            _error = $"DB debug failed: {ex.Message}";
+        }
+        finally
+        {
+            _loadingStored = false;
+        }
+    }
+
+    private async Task FetchLiveAsync()
+    {
+        _error = null;
+        _loadingLive = true;
+        try
+        {
+            _liveRows = await DebugService.FetchLiveRowsAsync(_user, DayOnly);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Live fetch failed: {ex.Message}";
+        }
+        finally
+        {
+            _loadingLive = false;
+        }
+    }
+}

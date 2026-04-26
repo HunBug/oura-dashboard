@@ -3,6 +3,7 @@
 @implements IDisposable
 
 @inject ISyncTrigger SyncTrigger
+@inject IOptions<OuraOptions> OuraOptions
 
 <PageTitle>Sync</PageTitle>
 
@@ -31,7 +32,7 @@
     <dd class="col-7">@(_state.IsRunning ? "Running" : "Idle")</dd>
 
     <dt class="col-5">Last sync</dt>
-    <dd class="col-7">@(_state.LastSyncAt.HasValue ? _state.LastSyncAt.Value.ToLocalTime().ToString("g") : "—")</dd>
+    <dd class="col-7">@(_state.LastSyncAt.HasValue ? FormatTimestamp(_state.LastSyncAt.Value) : "—")</dd>
 </dl>
 
 @if (_state.LastResults.Count > 0)
@@ -90,9 +91,11 @@
 @code {
     private SyncState _state = new();
     private Timer? _pollTimer;
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
 
     protected override void OnInitialized()
     {
+        _displayTimeZone = OuraTimeZone.Resolve(OuraOptions.Value.DisplayTimeZoneId);
         _state = SyncTrigger.State;
         // Poll every 2 s so the spinner/results update without needing StreamRendering
         _pollTimer = new Timer(async _ =>
@@ -113,6 +116,9 @@
         SyncTrigger.RequestFullSync();
         _state = SyncTrigger.State;
     }
+
+    private string FormatTimestamp(DateTimeOffset timestamp) =>
+        TimeZoneInfo.ConvertTime(timestamp, _displayTimeZone).ToString("g");
 
     public void Dispose() => _pollTimer?.Dispose();
 }

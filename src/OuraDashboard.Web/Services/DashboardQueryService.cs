@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using OuraDashboard.Data;
 using OuraDashboard.Data.Entities;
+using OuraDashboard.Sync;
 
 namespace OuraDashboard.Web.Services;
 
@@ -82,7 +84,7 @@ public record NightData(
     List<SamplePoint> HrvSeries,
     List<SamplePoint> HeartRateSeries);
 
-public class DashboardQueryService(OuraDbContext db)
+public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> options)
 {
     /// <summary>
     /// Returns daily overview rows for a user, last <paramref name="days"/> days,
@@ -91,7 +93,7 @@ public class DashboardQueryService(OuraDbContext db)
     /// </summary>
     public async Task<UserOverview> GetUserOverviewAsync(string userName, int days, CancellationToken ct = default)
     {
-        var end = DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = OuraTimeZone.Today(options.Value.DisplayTimeZoneId);
         var start = end.AddDays(-(days - 1));
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Name == userName, ct);
@@ -293,7 +295,7 @@ public class DashboardQueryService(OuraDbContext db)
     /// <summary>Returns the days that have a long_sleep session, descending.</summary>
     public async Task<List<DateOnly>> GetNightDaysAsync(string userName, int days, CancellationToken ct = default)
     {
-        var end = DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = OuraTimeZone.Today(options.Value.DisplayTimeZoneId);
         var start = end.AddDays(-(days - 1));
         var user = await db.Users.FirstOrDefaultAsync(u => u.Name == userName, ct);
         if (user is null) return [];
