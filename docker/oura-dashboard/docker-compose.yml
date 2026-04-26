@@ -1,0 +1,41 @@
+# Server-side compose for oura-dashboard
+# Managed by lara — do not edit manually on the server
+#
+# Secrets come from .env (never committed — see .env.template)
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oura
+      POSTGRES_USER: oura
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - /srv/oura-dashboard/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oura -d oura"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: lara:5000/oura-dashboard:latest
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      # Connection string — points to the sibling postgres container
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=oura;Username=oura;Password=${DB_PASSWORD}"
+
+      # Oura personal access tokens (two users)
+      Oura__Users__0__Name: "Boo"
+      Oura__Users__0__Token: "${OURA_TOKEN_BOO:?OURA_TOKEN_BOO is required}"
+      Oura__Users__1__Name: "Maa"
+      Oura__Users__1__Token: "${OURA_TOKEN_MAA:?OURA_TOKEN_MAA is required}"
+
+      # Background sync interval in minutes (default 60)
+      Oura__SyncIntervalMinutes: "${OURA_SYNC_INTERVAL_MINUTES:-60}"
+    depends_on:
+      postgres:
+        condition: service_healthy
