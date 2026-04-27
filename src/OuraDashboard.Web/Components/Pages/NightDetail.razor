@@ -34,11 +34,11 @@ else
                 <div class="mt-1 fst-italic" style="opacity:0.9;">@Summary</div>
             }
         </div>
-        @if (AbsoluteRestorationVal.HasValue)
+        @if (RrsVal.HasValue)
         {
             <div class="text-center ms-auto">
-                <div class="display-5 fw-bold lh-1">@AbsoluteRestorationVal</div>
-                <div class="small opacity-75">@MainScoreLabel</div>
+                <div class="display-5 fw-bold lh-1">@RrsVal</div>
+                <div class="small opacity-75">RRS / 100</div>
             </div>
         }
     </div>
@@ -431,15 +431,10 @@ else
     private string? _copyStatus;
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
 
-    // Use Oura's recovery index as the primary absolute restoration score.
-    // If unavailable for a night, fall back to readiness score.
-    private int?   AbsoluteRestorationVal => _detail?.ReadinessRecoveryIndex ?? _detail?.ReadinessScore;
-    private string MainScoreLabel => _detail?.ReadinessRecoveryIndex.HasValue == true
-        ? "Absolute Restoration / 100"
-        : "Readiness / 100";
-    private string VerdictBg => AbsoluteRestorationVal.HasValue
-        ? AbsoluteRestorationVal.Value >= 75 ? "bg-success text-white"
-        : AbsoluteRestorationVal.Value >= 50 ? "bg-warning text-dark"
+    private int?   RrsVal    => _metrics?.RealRecoveryScore;
+    private string VerdictBg => RrsVal.HasValue
+        ? RrsVal.Value >= 75 ? "bg-success text-white"
+        : RrsVal.Value >= 50 ? "bg-warning text-dark"
         : "bg-danger text-white"
         : "bg-secondary text-white";
     private string Summary   => _metrics is not null ? GenerateSummary(_detail!, _metrics) : string.Empty;
