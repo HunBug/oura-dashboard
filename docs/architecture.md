@@ -157,26 +157,7 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
 | `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Content dissolved into `MetricHelp.razor` `?` popovers (Step 7). Page still exists at `/metrics` as a reference; not linked from primary nav. |
 
-### Pages — redesign target 🔲
 
-See `docs/redesign-plan.md` for full detail on each page. Summary of route + component changes:
-
-| Route | Component | Change | Status |
-|---|---|---|---|
-| `/` | `Home.razor` | **Redesign** | ✅ Done (Steps 5–7) |
-| `/night/{name}/{day}` | `NightDetail.razor` | **Restructure** | ✅ Done (Step 2) |
-| `/user/{name}` | `UserDetail.razor` | **Enhance** | ✅ Done (Step 3) |
-| `/compare` | `Compare.razor` | **Redesign** | ✅ Done (Step 4) |
-| `/sync` | `Sync.razor` | No change | ✅ No action needed |
-| `/metrics` | `MetricsGuide.razor` | **Remove from nav → `?` popovers** | ✅ Done (Step 7) |
-
-**Removed entirely (Step 1):** `Counter.razor`, `Weather.razor`. `UserCard.razor` kept (used on Home).
-
-### Pages — planned 🔲
-
-| Route | Purpose |
-|---|---|
-| `/raw` | `Raw.razor` | ✅ Done: user + date-range + endpoint selector; `GetRawExportAsync` in `DashboardQueryService`; JSON `<pre>` display + copy-to-clipboard button. |
 
 ### Services
 
@@ -355,7 +336,7 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 9. ✅ **Custom metrics (on-the-fly)** — `NightMetricsCalculator.cs`: Real Recovery Score, HR % thresholds, HR settling time, HRV distribution/direction/peak; Oura score markers on HR/HRV charts; `/metrics` guide page
 10. ✅ **Web: raw export page** — `/raw`, JSON download, copy-to-clipboard
 11. 🔲 **Custom metrics (trend layer)** — 7-day rolling averages on user overview; autonomic state trend line
-12. 🔲 **Deployment** — systemd unit file, full Docker Compose variant
+12. 🔲 **Deployment** — systemd unit file, full Docker Compose variant (`docker-compose.full.yml`)
 
 ---
 
@@ -380,7 +361,8 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 
 ### 🔲 Still to do
 
-- **Deployment**: systemd unit, `docker-compose.full.yml`
+- **Deployment**: systemd unit file + `docker-compose.full.yml` (web + sync in containers)
+- **Custom metrics (trend layer)**: 7-day rolling averages on user overview; autonomic state trend line
 
 ---
 
@@ -403,14 +385,5 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - `appsettings.json` at repo root is loaded by both Web and Sync.Cli (both use `Host.CreateDefaultBuilder` / `WebApplication.CreateBuilder`)
 - `appsettings.Local.json` is gitignored — real tokens go there
 
-### Next implementation step: wire up `OuraDashboard.Web/Program.cs`
 
-```csharp
-// In src/OuraDashboard.Web/Program.cs, after var builder = WebApplication.CreateBuilder(args):
-builder.Services.Configure<OuraOptions>(builder.Configuration.GetSection(OuraOptions.SectionName));
-builder.Services.AddOuraDatabase(builder.Configuration.GetConnectionString("Default")!);
-builder.Services.AddOuraSync(addBackgroundService: true);
-```
-
-Then build the `/sync` page first (simplest — just reads `ISyncTrigger.State` and calls `RequestSync()`).
 

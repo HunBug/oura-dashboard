@@ -1,6 +1,6 @@
 # oura-dashboard
 
-Private Oura Ring data dashboard for a local home server. Pulls raw data from the Oura API into PostgreSQL, then serves a Blazor Server web app for analysis and visualisation.
+Private Oura Ring data dashboard for a home server. Pulls raw data from the Oura API into PostgreSQL, then serves a Blazor Server web app for analysis and visualisation.
 
 **Users:** Boo + Maa (two Oura rings, one dashboard).
 
@@ -17,11 +17,13 @@ Private Oura Ring data dashboard for a local home server. Pulls raw data from th
 
 | Route | What you get |
 |---|---|
-| `/` | Side-by-side 30-day overview cards for both users — sleep score, readiness, HRV, HR, respiratory rate, deep/REM sparklines |
-| `/user/{name}` | Full per-user detail: 4 charts, 9 aggregate stats, per-night data table with "→" links |
-| `/night/{name}/{day}` | Single-night drill-down: intra-night HRV & HR charts, all scalars, LLM-ready text export |
-| `/compare` | Boo vs Maa side-by-side — sleep score + HRV overlay charts, per-night comparison table |
-| `/sync` | Live sync status, per-user result counts, manual Refresh button |
+| `/` | Morning briefing: last-night strip (RRS, HRV, HR>75%, Restorative, Temp) for both users; dual-axis HRV 30-day chart; 4-line HR/Resp combo chart; auto-generated pattern callouts |
+| `/user/{name}` | Per-person 30-day history: 7-stat summary bar, HRV+Resp dual-axis chart, HR>75% chart, heatmap table; 7/14/30/90-day toggle |
+| `/night/{name}/{day}` | Single-night deep dive: RRS verdict bar, intra-night HR + HRV charts with zone annotations, 3 collapsible metric sections, breadcrumb + prev/next nav |
+| `/compare` | Boo vs Maa: dual-axis HRV overlay, clustered HR>75% bar, correlation badge, heatmap table |
+| `/sync` | Live sync status (2s poll), per-user result counts, manual Refresh button |
+| `/raw` | Raw JSON export: user + date-range + endpoint selector, copy-to-clipboard |
+| `/metrics` | Metrics guide: explanation of every custom metric (not linked from main nav) |
 
 ## Quick start
 
@@ -68,5 +70,7 @@ The background sync starts automatically at startup and runs every 60 minutes (c
 
 ## Deployment
 
-See [docs/architecture.md](docs/architecture.md) for the full design, configuration reference, and deployment options (standalone binary vs full Docker Compose).
+See [docs/architecture.md](docs/architecture.md) for the full design, configuration reference, API quirks, and deployment options.
+
+For LLM-assisted development, start new sessions with [docs/llm-context.md](docs/llm-context.md).
 
