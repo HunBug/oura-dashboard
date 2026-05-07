@@ -55,6 +55,10 @@ else
                             </div>
                         </div>
                         <div class="mt-2 text-muted small text-end">@_booLast.Day.ToString("dd MMM")</div>
+                        @if (_booWeather is not null)
+                        {
+                            <WeatherContextStrip Context="_booWeather" NightPressureLabel="Pressure" SunLabel="Sun" DayPressureLabel="Day pressure" />
+                        }
                     }
                 </div>
             </div>
@@ -100,6 +104,10 @@ else
                             </div>
                         </div>
                         <div class="mt-2 text-muted small text-end">@_maaLast.Day.ToString("dd MMM")</div>
+                        @if (_maaWeather is not null)
+                        {
+                            <WeatherContextStrip Context="_maaWeather" NightPressureLabel="Pressure" SunLabel="Sun" DayPressureLabel="Day pressure" />
+                        }
                     }
                 </div>
             </div>
@@ -121,6 +129,7 @@ else
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                     YValue="r => r.AvgHrv" />
             </ApexChart>
+            <WeatherAnnotationLane Dates="_chartDates" Contexts="_weatherContexts" />
         </div>
     </div>
 
@@ -145,6 +154,7 @@ else
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                     YValue="r => (decimal?)r.AvgBreath" />
             </ApexChart>
+            <WeatherAnnotationLane Dates="_chartDates" Contexts="_weatherContexts" />
         </div>
     </div>
 
@@ -172,6 +182,10 @@ else
 
     private DailyOverviewRow? _booLast;
     private DailyOverviewRow? _maaLast;
+    private WeatherNightContext? _booWeather;
+    private WeatherNightContext? _maaWeather;
+    private List<DateOnly> _chartDates = [];
+    private Dictionary<DateOnly, WeatherDayContext> _weatherContexts = [];
 
     private int?   _booRrs;
     private int?   _maaRrs;
@@ -201,6 +215,14 @@ else
 
         if (_booLast is not null) _booNightLink = $"night/Boo/{_booLast.Day:yyyy-MM-dd}";
         if (_maaLast is not null) _maaNightLink = $"night/Maa/{_maaLast.Day:yyyy-MM-dd}";
+        if (_booLast is not null) _booWeather = await Query.GetNightWeatherContextAsync("Boo", _booLast.Day);
+        if (_maaLast is not null) _maaWeather = await Query.GetNightWeatherContextAsync("Maa", _maaLast.Day);
+
+        _chartDates = _booRows.Select(r => r.Day).Union(_maaRows.Select(r => r.Day)).OrderBy(d => d).ToList();
+        if (_chartDates.Count > 0)
+        {
+            _weatherContexts = await Query.GetWeatherDayContextsAsync("Boo", _chartDates.First(), _chartDates.Last());
+        }
 
         _hrvOpts   = BuildHrvOpts();
         _comboOpts = BuildComboOpts();

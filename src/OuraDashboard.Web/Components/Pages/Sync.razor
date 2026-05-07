@@ -4,6 +4,7 @@
 
 @inject ISyncTrigger SyncTrigger
 @inject IOptions<OuraOptions> OuraOptions
+@inject IOptions<WeatherOptions> WeatherOptions
 @inject DashboardQueryService DbQuery
 
 <PageTitle>Sync</PageTitle>
@@ -35,7 +36,7 @@
         Weather refresh now
     </button>
     <button class="btn btn-outline-warning" @onclick="RequestFullWeatherSync" disabled="@_state.IsRunning"
-            title="Fetches the configured Weather:FullSyncLookbackDays window. Existing latest data is skipped per source.">
+            title="Fetches the configured Weather:FullSyncLookbackDays window and refreshes existing rows inside that window.">
         Weather historical reload
     </button>
 </div>
@@ -49,6 +50,12 @@
 
     <dt class="col-5">Last weather sync</dt>
     <dd class="col-7">@(_state.LastWeatherSyncAt.HasValue ? FormatTimestamp(_state.LastWeatherSyncAt.Value) : "—")</dd>
+
+    <dt class="col-5">Oura auto sync</dt>
+    <dd class="col-7">@AutoSyncText(OuraOptions.Value.AutoSyncEnabled, $"{OuraOptions.Value.SyncIntervalMinutes} min")</dd>
+
+    <dt class="col-5">Weather auto sync</dt>
+    <dd class="col-7">@AutoSyncText(WeatherOptions.Value.Enabled && WeatherOptions.Value.AutoSyncEnabled, $"{WeatherOptions.Value.SyncIntervalHours} h")</dd>
 </dl>
 
 @if (_state.LastResults.Count > 0)
@@ -165,6 +172,8 @@ else
             <tr>
                 <th>Source</th>
                 <th>Samples in DB</th>
+                <th>Pressure</th>
+                <th>Sun</th>
                 <th>Earliest (UTC)</th>
                 <th>Latest (UTC)</th>
             </tr>
@@ -175,12 +184,66 @@ else
                 <tr>
                     <td>@s.Source</td>
                     <td>@s.Count</td>
+                    <td>@s.PressureSamples</td>
+                    <td>@s.SunshineSamples</td>
                     <td>@(s.EarliestUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
                     <td>@(s.LatestUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
                 </tr>
             }
         </tbody>
     </table>
+    @if (_weatherStats.All(s => s.PressureSamples == 0 || s.SunshineSamples == 0))
+    {
+        <p class="text-muted small">
+            Weather context chips need pressure and sunshine rows for the same dates as the Oura nights. Estonian agency rows may still be unusable for those chips if they only contain temperature, humidity, or precipitation.
+        </p>
+    }
+}
+
+<h2 class="h5 mt-3">Weather context diagnostics</h2>
+@if (_weatherDebug is null)
+{
+    <p class="text-muted small">Loading…</p>
+}
+else if (_weatherDebug.Count == 0)
+{
+    <p class="text-muted small">No Oura nights available to diagnose.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm" style="max-width: 1120px">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Night</th>
+                    <th>Night window</th>
+                    <th>Night raw</th>
+                    <th>Night chip</th>
+                    <th>Previous day window</th>
+                    <th>Day raw</th>
+                    <th>Sun chip</th>
+                    <th>Day pressure chip</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _weatherDebug)
+                {
+                    <tr>
+                        <td>@row.UserName</td>
+                        <td>@row.Day.ToString("yyyy-MM-dd")</td>
+                        <td>@FormatWindow(row.NightStartLocal, row.NightEndLocal)</td>
+                        <td>@FormatCounts(row.NightCounts)</td>
+                        <td>@FormatPressure(row.Context?.NightPressure)</td>
+                        <td>@FormatWindow(row.PreviousDayStartLocal, row.PreviousDayEndLocal)</td>
+                        <td>@FormatCounts(row.PreviousDayCounts)</td>
+                        <td>@FormatSun(row.Context?.PreviousDaySun)</td>
+                        <td>@FormatPressure(row.Context?.PreviousDayPressure)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @if (_state.LastErrors.Count > 0)
@@ -202,6 +265,7 @@ else
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
     private List<OuraDbStats>? _ouraStats;
     private List<WeatherDbSourceStats>? _weatherStats;
+    private List<WeatherContextDebugRow>? _weatherDebug;
 
     protected override async Task OnInitializedAsync()
     {
@@ -220,6 +284,8 @@ else
     {
         _ouraStats = await DbQuery.GetOuraDbStatsAsync();
         _weatherStats = await DbQuery.GetWeatherDbStatsAsync();
+        _weatherDebug = await DbQuery.GetRecentWeatherContextDebugAsync(
+            OuraOptions.Value.Users.Select(u => u.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList());
     }
 
     private async Task RequestSync()
@@ -252,6 +318,29 @@ else
 
     private string FormatTimestamp(DateTimeOffset timestamp) =>
         TimeZoneInfo.ConvertTime(timestamp, _displayTimeZone).ToString("g");
+
+    private static string AutoSyncText(bool enabled, string interval) =>
+        enabled ? $"enabled, every {interval}" : "disabled";
+
+    private static string FormatWindow(DateTime start, DateTime end) =>
+        $"{start:MM-dd HH:mm} – {end:MM-dd HH:mm}";
+
+    private static string FormatCounts(WeatherWindowSampleCounts counts) =>
+        $"{counts.Rows} rows; pressure {counts.PressureRows}; sun {counts.SunshineRows}; {counts.SourceLabels}";
+
+    private static string FormatPressure(WeatherPressureContext? item) =>
+        item is null
+            ? "—"
+            : item.PressureChangeHpa.HasValue && item.Level != WeatherLevels.Insufficient
+                ? $"{item.PressureChangeHpa.Value:F1} hPa {item.Level} ({item.ValidSamples}/{item.ExpectedSamples}, {item.SourceLabel})"
+                : $"{item.Level} ({item.ValidSamples}/{item.ExpectedSamples}, {item.SourceLabel ?? "no source"})";
+
+    private static string FormatSun(WeatherSunContext? item) =>
+        item is null
+            ? "—"
+            : item.SunnyHours.HasValue && item.Level != WeatherLevels.Insufficient
+                ? $"{item.SunnyHours.Value:F1}h {item.Level} ({item.ValidSamples}/{item.ExpectedSamples}, {item.SourceLabel})"
+                : $"{item.Level} ({item.ValidSamples}/{item.ExpectedSamples}, {item.SourceLabel ?? "no source"})";
 
     public void Dispose() => _pollTimer?.Dispose();
 }

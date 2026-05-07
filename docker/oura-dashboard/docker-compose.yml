@@ -34,8 +34,11 @@ services:
       Oura__Users__1__Name: "Maa"
       Oura__Users__1__Token: "${OURA_TOKEN_MAA:?OURA_TOKEN_MAA is required}"
 
-      # Background sync interval in minutes (default 60)
-      Oura__SyncIntervalMinutes: "${OURA_SYNC_INTERVAL_MINUTES:-60}"
+      # Background sync intervals; set *_AUTO_SYNC_ENABLED=false to use manual sync only
+      Oura__SyncIntervalMinutes: "${OURA_SYNC_INTERVAL_MINUTES:-360}"
+      Oura__AutoSyncEnabled: "${OURA_AUTO_SYNC_ENABLED:-true}"
+      Weather__AutoSyncEnabled: "${WEATHER_AUTO_SYNC_ENABLED:-true}"
+      Weather__SyncIntervalHours: "${WEATHER_SYNC_INTERVAL_HOURS:-24}"
       Oura__DisplayTimeZoneId: "Europe/Tallinn"
       TZ: "Europe/Tallinn"
     depends_on:

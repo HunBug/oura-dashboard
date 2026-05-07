@@ -23,7 +23,7 @@
 | ORM | EF Core 9 + Npgsql |
 | Database | PostgreSQL 17 via Docker (port **5433**) |
 | CSS | Bootstrap 5 |
-| Tests | xUnit (25 tests) |
+| Tests | xUnit (37 tests) |
 
 ## Solution layout
 
@@ -47,11 +47,11 @@ docs/
 
 | Route | Component | Description |
 |---|---|---|
-| `/` | `Home.razor` | Morning briefing: RRS strip (last night, both users) + dual-axis HRV + combo HR/Resp charts + pattern callouts |
-| `/user/{name}` | `UserDetail.razor` | 30-day history per person, heatmap table, 7/14/30/90-day toggle |
-| `/night/{name}/{day}` | `NightDetail.razor` | Single-night deep dive: verdict bar (RRS), intra-night HR + HRV charts, 3 collapsible metric sections |
-| `/compare` | `Compare.razor` | Boo vs Maa overlays: dual-axis HRV, clustered HR>75%, correlation badge |
-| `/sync` | `Sync.razor` | Sync status (2s poll), per-user counts, Refresh button |
+| `/` | `Home.razor` | Morning briefing: RRS strip (last night, both users) + compact weather context + dual-axis HRV + combo HR/Resp charts + weather lanes + pattern callouts |
+| `/user/{name}` | `UserDetail.razor` | History per person, weather lanes, heatmap table with weather markers, 7/14/30/90-day toggle |
+| `/night/{name}/{day}` | `NightDetail.razor` | Single-night deep dive: verdict bar (RRS), weather context strip, intra-night HR + HRV charts, 3 collapsible metric sections |
+| `/compare` | `Compare.razor` | Boo vs Maa overlays: dual-axis HRV, clustered HR>75%, weather lanes, correlation badge |
+| `/sync` | `Sync.razor` | Sync status (2s poll), per-user counts, manual refresh/reload buttons, weather DB totals + context diagnostics |
 | `/raw` | `Raw.razor` | Raw JSON export by user + date + endpoint |
 | `/metrics` | `MetricsGuide.razor` | Explanations of all custom metrics (not in main nav) |
 
@@ -81,6 +81,9 @@ docs/
 - `GetUserOverviewAsync(userName, days)` → `UserOverview` with `List<DailyOverviewRow>`
 - `GetNightDetailAsync(userName, day)` → `NightData?`
 - `GetNightDaysAsync(userName, days)` → `List<DateOnly>` (for prev/next nav)
+- `GetNightWeatherContextAsync(userName, day)` → `WeatherNightContext?`
+- `GetWeatherDayContextsAsync(userName, start, end)` → weather annotation lane data
+- `GetRecentWeatherContextDebugAsync(...)` → `/sync` weather diagnostics
 - `GetRawExportAsync(...)` → raw JSON strings from RawJson columns
 
 **`NightMetrics`** — pure static, computed on-the-fly from intra-night timeseries.
@@ -91,13 +94,20 @@ No DB queries, no DI. Fields:
 - `HrvEarlyHalfAvg`, `HrvLateHalfAvg`, `HrvPeak`, HRV distribution buckets
 - `RestorativeMinutes`
 
-**`SyncBackgroundService`** (hosted in Web) — timer + Channel trigger. Handles Oura sync plus weather sync. Oura defaults hourly; weather defaults every 6 hours. `/sync` has separate refresh and historical reload buttons.
+**`SyncBackgroundService`** (hosted in Web) — timer + Channel trigger. Handles Oura sync plus weather sync. Defaults: Oura auto-sync enabled every 360 minutes, weather auto-sync enabled every 24 hours. Both can be disabled with `Oura:AutoSyncEnabled` / `Weather:AutoSyncEnabled`; `/sync` manual buttons still work.
 
 **`WeatherSyncService`** — location-based historical weather collection.
 - Open-Meteo archive API, no token, default model `best_match`.
 - Estonian Environment Agency open data, station metadata plus hourly climate observations.
 - Normal syncs skip already-collected hours per source/model/station.
+- Historical weather reload refreshes the full requested lookback window so it can backfill older missing rows.
 - CLI: `--weather --days N` for weather only, `--all --days N` for Oura + weather.
+
+**Weather UI rules** — context only, not correlation.
+- Pressure uses `pressure_msl` first, then `surface_pressure`; level is acceptable `<4 hPa`, medium `4-8 hPa`, high `>8 hPa`.
+- Sun uses Open-Meteo `sunshine_duration`; level is enough `>=5h`, middle `2-5h`, low `<2h`.
+- Both require at least 70% hourly coverage; otherwise show `insufficient data`.
+- `/night` and home show numeric chips; home/user/compare charts show `P/D/S` annotation lanes.
 
 ## Non-obvious rules & gotchas
 

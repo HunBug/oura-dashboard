@@ -85,9 +85,72 @@ public record NightData(
     List<SamplePoint> HeartRateSeries);
 
 public record OuraDbStats(string UserName, int Days, DateOnly? EarliestDay, DateOnly? LatestDay);
-public record WeatherDbSourceStats(string Source, int Count, DateTimeOffset? EarliestUtc, DateTimeOffset? LatestUtc);
+public record WeatherDbSourceStats(
+    string Source,
+    int Count,
+    int PressureSamples,
+    int SunshineSamples,
+    DateTimeOffset? EarliestUtc,
+    DateTimeOffset? LatestUtc);
+public record WeatherPressureSourceContext(
+    string SourceLabel,
+    double? PressureChangeHpa,
+    string Level,
+    int ValidSamples,
+    int ExpectedSamples,
+    double CoveragePct);
 
-public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> options)
+public record WeatherPressureContext(
+    double? PressureChangeHpa,
+    string Level,
+    int ValidSamples,
+    int ExpectedSamples,
+    double CoveragePct,
+    string? SourceLabel,
+    bool HasDisagreement,
+    IReadOnlyList<WeatherPressureSourceContext> Sources);
+
+public record WeatherSunContext(
+    double? SunnyHours,
+    string Level,
+    int ValidSamples,
+    int ExpectedSamples,
+    double CoveragePct,
+    string? SourceLabel);
+
+public record WeatherNightContext(
+    DateOnly Day,
+    WeatherPressureContext NightPressure,
+    WeatherSunContext PreviousDaySun,
+    WeatherPressureContext PreviousDayPressure);
+
+public record WeatherDayContext(
+    DateOnly Day,
+    WeatherPressureContext? NightPressure,
+    WeatherSunContext PreviousDaySun,
+    WeatherPressureContext PreviousDayPressure);
+
+public record WeatherWindowSampleCounts(
+    int Rows,
+    int PressureRows,
+    int SunshineRows,
+    string SourceLabels);
+
+public record WeatherContextDebugRow(
+    string UserName,
+    DateOnly Day,
+    DateTime NightStartLocal,
+    DateTime NightEndLocal,
+    DateTime PreviousDayStartLocal,
+    DateTime PreviousDayEndLocal,
+    WeatherWindowSampleCounts NightCounts,
+    WeatherWindowSampleCounts PreviousDayCounts,
+    WeatherNightContext? Context);
+
+public class DashboardQueryService(
+    OuraDbContext db,
+    IOptions<OuraOptions> options,
+    IOptions<WeatherOptions> weatherOptions)
 {
     /// <summary>
     /// Returns daily overview rows for a user, last <paramref name="days"/> days,
@@ -310,6 +373,144 @@ public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> optio
             .ToListAsync(ct);
     }
 
+    public async Task<WeatherNightContext?> GetNightWeatherContextAsync(
+        string userName,
+        DateOnly day,
+        CancellationToken ct = default)
+    {
+        var session = await GetPrimarySessionWindowAsync(userName, day, ct);
+        if (session is null)
+            return null;
+
+        var weatherTimeZone = ResolveWeatherTimeZone();
+        var nightStart = TimeZoneInfo.ConvertTime(session.Value.Start, weatherTimeZone).DateTime;
+        var nightEnd = TimeZoneInfo.ConvertTime(session.Value.End, weatherTimeZone).DateTime;
+        var previousDay = DayBeforeSleep(nightStart);
+        var dayStart = previousDay.ToDateTime(new TimeOnly(8, 0));
+        var dayEnd = previousDay.ToDateTime(new TimeOnly(20, 0));
+
+        return new WeatherNightContext(
+            day,
+            await BuildPressureContextAsync(nightStart, nightEnd, ct),
+            await BuildSunContextAsync(dayStart, dayEnd, ct),
+            await BuildPressureContextAsync(dayStart, dayEnd, ct));
+    }
+
+    public async Task<Dictionary<DateOnly, WeatherDayContext>> GetWeatherDayContextsAsync(
+        string userName,
+        DateOnly start,
+        DateOnly end,
+        CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Name == userName, ct);
+        if (user is null) return [];
+
+        var sessions = await db.SleepSessions
+            .Where(x => x.UserId == user.Id && x.Day >= start && x.Day <= end)
+            .Select(x => new
+            {
+                x.Day,
+                x.Type,
+                x.DeepSleepDuration,
+                x.RemSleepDuration,
+                x.BedtimeStart,
+                x.BedtimeEnd,
+            })
+            .ToListAsync(ct);
+
+        var weatherTimeZone = ResolveWeatherTimeZone();
+        var sessionByDay = sessions
+            .GroupBy(s => s.Day)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(s => s.Type == "long_sleep")
+                    .ThenByDescending(s => (s.DeepSleepDuration ?? 0) + (s.RemSleepDuration ?? 0))
+                    .First());
+
+        var result = new Dictionary<DateOnly, WeatherDayContext>();
+        for (var day = start; day <= end; day = day.AddDays(1))
+        {
+            WeatherPressureContext? nightPressure = null;
+            var contextDay = day;
+
+            if (sessionByDay.TryGetValue(day, out var session))
+            {
+                var nightStart = TimeZoneInfo.ConvertTime(session.BedtimeStart, weatherTimeZone).DateTime;
+                var nightEnd = TimeZoneInfo.ConvertTime(session.BedtimeEnd, weatherTimeZone).DateTime;
+                contextDay = DayBeforeSleep(nightStart);
+                nightPressure = await BuildPressureContextAsync(nightStart, nightEnd, ct);
+            }
+
+            var dayStart = contextDay.ToDateTime(new TimeOnly(8, 0));
+            var dayEnd = contextDay.ToDateTime(new TimeOnly(20, 0));
+
+            result[day] = new WeatherDayContext(
+                day,
+                nightPressure,
+                await BuildSunContextAsync(dayStart, dayEnd, ct),
+                await BuildPressureContextAsync(dayStart, dayEnd, ct));
+        }
+
+        return result;
+    }
+
+    public async Task<List<WeatherContextDebugRow>> GetRecentWeatherContextDebugAsync(
+        IReadOnlyCollection<string> userNames,
+        int nightsPerUser = 3,
+        CancellationToken ct = default)
+    {
+        var weatherTimeZone = ResolveWeatherTimeZone();
+        var sessions = await db.SleepSessions
+            .Include(x => x.User)
+            .Where(x => userNames.Count == 0 || userNames.Contains(x.User.Name))
+            .Select(x => new
+            {
+                UserName = x.User.Name,
+                x.Day,
+                x.Type,
+                x.DeepSleepDuration,
+                x.RemSleepDuration,
+                x.BedtimeStart,
+                x.BedtimeEnd,
+            })
+            .ToListAsync(ct);
+
+        var primarySessions = sessions
+            .GroupBy(x => new { x.UserName, x.Day })
+            .Select(g => g
+                .OrderByDescending(x => x.Type == "long_sleep")
+                .ThenByDescending(x => (x.DeepSleepDuration ?? 0) + (x.RemSleepDuration ?? 0))
+                .First())
+            .GroupBy(x => x.UserName)
+            .SelectMany(g => g.OrderByDescending(x => x.Day).Take(nightsPerUser))
+            .OrderBy(x => x.UserName)
+            .ThenByDescending(x => x.Day)
+            .ToList();
+
+        var result = new List<WeatherContextDebugRow>();
+        foreach (var session in primarySessions)
+        {
+            var nightStart = TimeZoneInfo.ConvertTime(session.BedtimeStart, weatherTimeZone).DateTime;
+            var nightEnd = TimeZoneInfo.ConvertTime(session.BedtimeEnd, weatherTimeZone).DateTime;
+            var previousDay = DayBeforeSleep(nightStart);
+            var dayStart = previousDay.ToDateTime(new TimeOnly(8, 0));
+            var dayEnd = previousDay.ToDateTime(new TimeOnly(20, 0));
+
+            result.Add(new WeatherContextDebugRow(
+                session.UserName,
+                session.Day,
+                nightStart,
+                nightEnd,
+                dayStart,
+                dayEnd,
+                await BuildWindowSampleCountsAsync(nightStart, nightEnd, ct),
+                await BuildWindowSampleCountsAsync(dayStart, dayEnd, ct),
+                await GetNightWeatherContextAsync(session.UserName, session.Day, ct)));
+        }
+
+        return result;
+    }
+
     private static List<SamplePoint> ParseSeries(JsonDocument? doc)
     {
         if (doc is null) return [];
@@ -331,6 +532,201 @@ public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> optio
         }
         return result;
     }
+
+    private async Task<(DateTimeOffset Start, DateTimeOffset End)?> GetPrimarySessionWindowAsync(
+        string userName,
+        DateOnly day,
+        CancellationToken ct)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Name == userName, ct);
+        if (user is null) return null;
+
+        var session = await db.SleepSessions
+            .Where(x => x.UserId == user.Id && x.Day == day)
+            .OrderByDescending(x => x.Type == "long_sleep")
+            .ThenByDescending(x => (x.DeepSleepDuration ?? 0) + (x.RemSleepDuration ?? 0))
+            .Select(x => new { x.BedtimeStart, x.BedtimeEnd })
+            .FirstOrDefaultAsync(ct);
+
+        return session is null ? null : (session.BedtimeStart, session.BedtimeEnd);
+    }
+
+    private async Task<WeatherPressureContext> BuildPressureContextAsync(
+        DateTime startLocal,
+        DateTime endLocal,
+        CancellationToken ct)
+    {
+        var expectedSamples = ExpectedHourlySamples(startLocal, endLocal);
+        var rows = await LoadWeatherRowsAsync(startLocal, endLocal, ct);
+        var sources = rows
+            .Where(x => x.PressureMslHpa.HasValue || x.SurfacePressureHpa.HasValue)
+            .GroupBy(SourceGroupKey)
+            .Select(g =>
+            {
+                var values = g.Select(x => x.PressureMslHpa ?? x.SurfacePressureHpa).Where(x => x.HasValue).Select(x => x!.Value).ToList();
+                double? change = values.Count > 0 ? values.Max() - values.Min() : null;
+                var coverage = expectedSamples == 0 ? 0 : values.Count * 100.0 / expectedSamples;
+                return new WeatherPressureSourceContext(
+                    SourceLabel(g.First()),
+                    change,
+                    WeatherClassifiers.PressureLevel(change, coverage),
+                    values.Count,
+                    expectedSamples,
+                    coverage);
+            })
+            .OrderBy(x => SourceRank(x.SourceLabel))
+            .ThenByDescending(x => x.CoveragePct)
+            .ToList();
+
+        var primary = sources.FirstOrDefault(x => x.Level != WeatherLevels.Insufficient)
+            ?? sources.FirstOrDefault();
+        var hasDisagreement = primary is not null && sources.Any(x =>
+            WeatherClassifiers.PressureSeverity(primary.Level) >= 0
+            && WeatherClassifiers.PressureSeverity(x.Level) >= 0
+            && Math.Abs(WeatherClassifiers.PressureSeverity(primary.Level) - WeatherClassifiers.PressureSeverity(x.Level)) > 1);
+
+        return new WeatherPressureContext(
+            primary?.PressureChangeHpa,
+            primary?.Level ?? WeatherLevels.Insufficient,
+            primary?.ValidSamples ?? 0,
+            expectedSamples,
+            primary?.CoveragePct ?? 0,
+            primary?.SourceLabel,
+            hasDisagreement,
+            sources);
+    }
+
+    private async Task<WeatherSunContext> BuildSunContextAsync(
+        DateTime startLocal,
+        DateTime endLocal,
+        CancellationToken ct)
+    {
+        var expectedSamples = ExpectedHourlySamples(startLocal, endLocal);
+        var rows = await LoadWeatherRowsAsync(startLocal, endLocal, ct);
+        var source = rows
+            .Where(x => x.SunshineDurationSec.HasValue)
+            .GroupBy(SourceGroupKey)
+            .Select(g =>
+            {
+                var values = g.Select(x => x.SunshineDurationSec).Where(x => x.HasValue).Select(x => x!.Value).ToList();
+                var hours = values.Count > 0 ? values.Sum() / 3600.0 : (double?)null;
+                var coverage = expectedSamples == 0 ? 0 : values.Count * 100.0 / expectedSamples;
+                return new WeatherSunContext(
+                    hours,
+                    WeatherClassifiers.SunLevel(hours, coverage),
+                    values.Count,
+                    expectedSamples,
+                    coverage,
+                    SourceLabel(g.First()));
+            })
+            .OrderBy(x => SourceRank(x.SourceLabel ?? string.Empty))
+            .ThenByDescending(x => x.CoveragePct)
+            .FirstOrDefault();
+
+        return source ?? new WeatherSunContext(null, WeatherLevels.Insufficient, 0, expectedSamples, 0, null);
+    }
+
+    private async Task<List<WeatherSampleProjection>> LoadWeatherRowsAsync(
+        DateTime startLocal,
+        DateTime endLocal,
+        CancellationToken ct)
+    {
+        var locationName = weatherOptions.Value.LocationName;
+        return await db.WeatherHourlySamples
+            .Include(x => x.WeatherLocation)
+            .Include(x => x.WeatherStation)
+            .Where(x => (string.IsNullOrWhiteSpace(locationName) || x.WeatherLocation.Name == locationName)
+                && x.TimestampLocal >= startLocal
+                && x.TimestampLocal < endLocal)
+            .Select(x => new WeatherSampleProjection(
+                x.Source,
+                x.Model,
+                x.WeatherStationId,
+                x.WeatherStation == null ? null : x.WeatherStation.StationCode,
+                x.WeatherStation == null ? null : x.WeatherStation.Name,
+                x.PressureMslHpa,
+                x.SurfacePressureHpa,
+                x.SunshineDurationSec))
+            .ToListAsync(ct);
+    }
+
+    private async Task<WeatherWindowSampleCounts> BuildWindowSampleCountsAsync(
+        DateTime startLocal,
+        DateTime endLocal,
+        CancellationToken ct)
+    {
+        var rows = await LoadWeatherRowsAsync(startLocal, endLocal, ct);
+        var sources = rows
+            .Select(SourceLabel)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => SourceRank(x))
+            .ThenBy(x => x)
+            .ToList();
+
+        return new WeatherWindowSampleCounts(
+            rows.Count,
+            rows.Count(x => x.PressureMslHpa.HasValue || x.SurfacePressureHpa.HasValue),
+            rows.Count(x => x.SunshineDurationSec.HasValue),
+            sources.Count == 0 ? "none" : string.Join(", ", sources));
+    }
+
+    private TimeZoneInfo ResolveWeatherTimeZone()
+    {
+        try
+        {
+            var id = string.IsNullOrWhiteSpace(weatherOptions.Value.Timezone)
+                ? options.Value.DisplayTimeZoneId
+                : weatherOptions.Value.Timezone;
+            return OuraTimeZone.Resolve(id);
+        }
+        catch
+        {
+            return OuraTimeZone.Resolve(options.Value.DisplayTimeZoneId);
+        }
+    }
+
+    private static DateOnly DayBeforeSleep(DateTime sleepStartLocal)
+    {
+        var day = DateOnly.FromDateTime(sleepStartLocal);
+        return sleepStartLocal.TimeOfDay < TimeSpan.FromHours(8) ? day.AddDays(-1) : day;
+    }
+
+    private static int ExpectedHourlySamples(DateTime startLocal, DateTime endLocal)
+    {
+        var hours = (endLocal - startLocal).TotalHours;
+        return hours <= 0 ? 0 : Math.Max(1, (int)Math.Ceiling(hours));
+    }
+
+    private static string SourceGroupKey(WeatherSampleProjection sample) =>
+        $"{sample.Source}|{sample.Model}|{sample.WeatherStationId}";
+
+    private static string SourceLabel(WeatherSampleProjection sample)
+    {
+        if (!string.IsNullOrWhiteSpace(sample.Model))
+            return $"{sample.Source} {sample.Model}";
+        if (!string.IsNullOrWhiteSpace(sample.StationCode))
+            return $"{sample.Source} {sample.StationCode}";
+        return sample.Source;
+    }
+
+    private static int SourceRank(string sourceLabel)
+    {
+        var label = sourceLabel.ToLowerInvariant();
+        if (label.Contains("open") && label.Contains("best_match")) return 0;
+        if (label.Contains("open")) return 1;
+        if (label.Contains("estonian")) return 2;
+        return 9;
+    }
+
+    private record WeatherSampleProjection(
+        string Source,
+        string? Model,
+        int? WeatherStationId,
+        string? StationCode,
+        string? StationName,
+        double? PressureMslHpa,
+        double? SurfacePressureHpa,
+        double? SunshineDurationSec);
 
     /// <summary>
     /// Returns raw JSON strings for the given endpoint and date range.
@@ -433,12 +829,14 @@ public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> optio
             {
                 Source = g.Key,
                 Count = g.Count(),
+                PressureSamples = g.Count(x => x.PressureMslHpa.HasValue || x.SurfacePressureHpa.HasValue),
+                SunshineSamples = g.Count(x => x.SunshineDurationSec.HasValue),
                 Min = g.Min(x => (DateTimeOffset?)x.TimestampUtc),
                 Max = g.Max(x => (DateTimeOffset?)x.TimestampUtc)
             })
             .OrderBy(x => x.Source)
             .ToListAsync(ct);
 
-        return rows.Select(r => new WeatherDbSourceStats(r.Source, r.Count, r.Min, r.Max)).ToList();
+        return rows.Select(r => new WeatherDbSourceStats(r.Source, r.Count, r.PressureSamples, r.SunshineSamples, r.Min, r.Max)).ToList();
     }
 }

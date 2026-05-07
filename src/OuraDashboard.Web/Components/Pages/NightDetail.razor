@@ -33,6 +33,7 @@ else
             {
                 <div class="mt-1 fst-italic" style="opacity:0.9;">@Summary</div>
             }
+            <WeatherContextStrip Context="_weatherContext" ShowSource="true" />
         </div>
         @if (RrsVal.HasValue)
         {
@@ -430,6 +431,7 @@ else
     private ElementReference _textareaRef;
     private string? _copyStatus;
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
+    private WeatherNightContext? _weatherContext;
 
     private int?   RrsVal    => _metrics?.RealRecoveryScore;
     private string VerdictBg => RrsVal.HasValue
@@ -457,6 +459,7 @@ else
         }
 
         _detail = await Query.GetNightDetailAsync(UserName, day);
+        _weatherContext = await Query.GetNightWeatherContextAsync(UserName, day);
 
         // Build prev/next navigation from available nights
         var nights = await Query.GetNightDaysAsync(UserName, 90);

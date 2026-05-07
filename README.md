@@ -17,11 +17,11 @@ Private Oura Ring data dashboard for a home server. Pulls raw data from the Oura
 
 | Route | What you get |
 |---|---|
-| `/` | Morning briefing: last-night strip (RRS, HRV, HR>75%, Restorative, Temp) for both users; dual-axis HRV 30-day chart; 4-line HR/Resp combo chart; auto-generated pattern callouts |
-| `/user/{name}` | Per-person 30-day history: 7-stat summary bar, HRV+Resp dual-axis chart, HR>75% chart, heatmap table; 7/14/30/90-day toggle |
-| `/night/{name}/{day}` | Single-night deep dive: RRS verdict bar, intra-night HR + HRV charts with zone annotations, 3 collapsible metric sections, breadcrumb + prev/next nav |
-| `/compare` | Boo vs Maa: dual-axis HRV overlay, clustered HR>75% bar, correlation badge, heatmap table |
-| `/sync` | Live sync status (2s poll), per-user result counts, manual Refresh button |
+| `/` | Morning briefing: last-night strip (RRS, HRV, HR>75%, Restorative, Temp, weather context) for both users; dual-axis HRV 30-day chart; 4-line HR/Resp combo chart with weather annotation lanes; auto-generated pattern callouts |
+| `/user/{name}` | Per-person history: 7-stat summary bar, HRV+Resp dual-axis chart, HR>75% chart, weather annotation lanes, heatmap table with weather markers; 7/14/30/90-day toggle |
+| `/night/{name}/{day}` | Single-night deep dive: RRS verdict bar, weather context strip, intra-night HR + HRV charts with zone annotations, 3 collapsible metric sections, breadcrumb + prev/next nav |
+| `/compare` | Boo vs Maa: dual-axis HRV overlay, clustered HR>75% bar, weather annotation lanes, correlation badge, heatmap table |
+| `/sync` | Live sync status (2s poll), per-user result counts, manual refresh/reload buttons, DB totals, weather context diagnostics |
 | `/raw` | Raw JSON export: user + date-range + endpoint selector, copy-to-clipboard |
 | `/metrics` | Metrics guide: explanation of every custom metric (not linked from main nav) |
 
@@ -66,11 +66,10 @@ dotnet run --project src/OuraDashboard.Web
 
 Open `http://localhost:5195`.
 
-The background sync starts automatically at startup and runs every 60 minutes (configurable via `Oura:SyncIntervalMinutes`). Use the `/sync` page to trigger an immediate sync.
+Background sync starts automatically unless disabled. Oura runs every 360 minutes by default (`Oura:AutoSyncEnabled`, `Oura:SyncIntervalMinutes`); weather runs every 24 hours by default (`Weather:AutoSyncEnabled`, `Weather:SyncIntervalHours`). Use the `/sync` page to trigger manual syncs.
 
 ## Deployment
 
 See [docs/architecture.md](docs/architecture.md) for the full design, configuration reference, API quirks, and deployment options.
 
 For LLM-assisted development, start new sessions with [docs/llm-context.md](docs/llm-context.md).
-

@@ -26,7 +26,10 @@ public class WeatherSyncService(
     private const string OpenMeteoSource = "open-meteo";
     private const string EstonianAgencySource = "estonian-environment-agency";
 
-    public async Task<WeatherSyncResult> SyncAsync(int days, CancellationToken ct = default)
+    public async Task<WeatherSyncResult> SyncAsync(
+        int days,
+        bool refreshExistingWindow = false,
+        CancellationToken ct = default)
     {
         var config = options.Value;
         var errors = new List<string>();
@@ -50,7 +53,7 @@ public class WeatherSyncService(
         if (config.Sources.OpenMeteo.Enabled)
         {
             var latest = await LatestSampleAsync(location.Id, OpenMeteoSource, config.Sources.OpenMeteo.Model, null, ct);
-            var start = MissingStart(startUtc, latest);
+            var start = refreshExistingWindow ? startUtc : MissingStart(startUtc, latest);
             if (start <= endUtc)
                 openMeteoCount = await SyncOpenMeteoAsync(location, config, start, endUtc, errors, ct);
         }
@@ -63,7 +66,7 @@ public class WeatherSyncService(
             foreach (var station in stations)
             {
                 var latest = await LatestSampleAsync(location.Id, EstonianAgencySource, null, station.Id, ct);
-                var start = MissingStart(startUtc, latest);
+                var start = refreshExistingWindow ? startUtc : MissingStart(startUtc, latest);
                 if (start <= endUtc)
                     estonianCount += await SyncEstonianStationElementAsync(location, station, config, start, endUtc, errors, ct);
             }

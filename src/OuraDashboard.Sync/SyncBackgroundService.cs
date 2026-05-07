@@ -39,25 +39,25 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
     public bool RequestSync()
     {
         if (_state.IsRunning) return false;
-        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Oura, _options.Value.SyncLookbackDays));
+        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Oura, _options.Value.SyncLookbackDays, false));
     }
 
     public bool RequestFullSync()
     {
         if (_state.IsRunning) return false;
-        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Oura, _options.Value.FullSyncLookbackDays));
+        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Oura, _options.Value.FullSyncLookbackDays, true));
     }
 
     public bool RequestWeatherSync()
     {
         if (_state.IsRunning || !_weatherOptions.Value.Enabled) return false;
-        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Weather, _weatherOptions.Value.SyncLookbackDays));
+        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Weather, _weatherOptions.Value.SyncLookbackDays, false));
     }
 
     public bool RequestFullWeatherSync()
     {
         if (_state.IsRunning || !_weatherOptions.Value.Enabled) return false;
-        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Weather, _weatherOptions.Value.FullSyncLookbackDays));
+        return _triggerChannel.Writer.TryWrite(new SyncRequest(SyncRequestKind.Weather, _weatherOptions.Value.FullSyncLookbackDays, true));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -65,7 +65,7 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
         _logger.LogInformation("SyncBackgroundService started. Oura interval: {OuraInterval} min. Weather interval: {WeatherInterval} h",
             _options.Value.SyncIntervalMinutes, _weatherOptions.Value.SyncIntervalHours);
 
-        var ouraInterval = TimeSpan.FromMinutes(_options.Value.SyncIntervalMinutes);
+        var ouraInterval = TimeSpan.FromMinutes(Math.Max(_options.Value.SyncIntervalMinutes, 1));
         var weatherInterval = TimeSpan.FromHours(Math.Max(_weatherOptions.Value.SyncIntervalHours, 1));
         var nextOura = DateTimeOffset.UtcNow;
         var nextWeather = DateTimeOffset.UtcNow;
@@ -80,17 +80,17 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
             }
 
             var now = DateTimeOffset.UtcNow;
-            if (now >= nextOura)
+            if (_options.Value.AutoSyncEnabled && now >= nextOura)
             {
                 _logger.LogInformation("Scheduled Oura sync triggered");
-                await RunSyncAsync(new SyncRequest(SyncRequestKind.Oura, _options.Value.SyncLookbackDays), stoppingToken);
+                await RunSyncAsync(new SyncRequest(SyncRequestKind.Oura, _options.Value.SyncLookbackDays, false), stoppingToken);
                 nextOura = DateTimeOffset.UtcNow.Add(ouraInterval);
             }
 
-            if (_weatherOptions.Value.Enabled && now >= nextWeather)
+            if (_weatherOptions.Value.Enabled && _weatherOptions.Value.AutoSyncEnabled && now >= nextWeather)
             {
                 _logger.LogInformation("Scheduled weather sync triggered");
-                await RunSyncAsync(new SyncRequest(SyncRequestKind.Weather, _weatherOptions.Value.SyncLookbackDays), stoppingToken);
+                await RunSyncAsync(new SyncRequest(SyncRequestKind.Weather, _weatherOptions.Value.SyncLookbackDays, false), stoppingToken);
                 nextWeather = DateTimeOffset.UtcNow.Add(weatherInterval);
             }
         }
@@ -126,7 +126,7 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
             else
             {
                 var weatherService = scope.ServiceProvider.GetRequiredService<WeatherSyncService>();
-                var result = await weatherService.SyncAsync(request.Days, ct);
+                var result = await weatherService.SyncAsync(request.Days, request.RefreshExistingWindow, ct);
                 _state.LastWeatherResult = result;
                 _state.LastErrors.AddRange(result.Errors);
                 _state.LastWeatherSyncAt = DateTimeOffset.UtcNow;
@@ -145,5 +145,5 @@ public sealed class SyncBackgroundService : BackgroundService, ISyncTrigger
 
     private enum SyncRequestKind { Oura, Weather }
 
-    private readonly record struct SyncRequest(SyncRequestKind Kind, int Days);
+    private readonly record struct SyncRequest(SyncRequestKind Kind, int Days, bool RefreshExistingWindow);
 }

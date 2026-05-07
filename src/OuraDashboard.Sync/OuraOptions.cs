@@ -6,8 +6,11 @@ public class OuraOptions
 
     public List<OuraUserConfig> Users { get; set; } = [];
 
-    /// <summary>How often the background service triggers a sync. Default: 60 minutes.</summary>
-    public int SyncIntervalMinutes { get; set; } = 60;
+    /// <summary>Whether scheduled background syncs run automatically. Manual sync buttons still work. Default: true.</summary>
+    public bool AutoSyncEnabled { get; set; } = true;
+
+    /// <summary>How often the background service triggers a sync. Default: 360 minutes.</summary>
+    public int SyncIntervalMinutes { get; set; } = 360;
 
     /// <summary>How many days back to fetch on each scheduled/background sync run. Default: 2.</summary>
     public int SyncLookbackDays { get; set; } = 2;

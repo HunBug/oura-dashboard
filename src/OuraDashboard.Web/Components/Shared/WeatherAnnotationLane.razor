@@ -1,0 +1,66 @@
+@if (Dates.Count > 0)
+{
+    <div class="weather-lane" style="grid-template-columns: repeat(@Dates.Count, minmax(0, 1fr));">
+        @foreach (var day in Dates)
+        {
+            Contexts.TryGetValue(day, out var context);
+            <div class="weather-lane-cell" title="@Title(day, context)">
+                <span class="@MarkerClass(context?.NightPressure?.Level)">@PressureMarker("P", context?.NightPressure?.Level, Dense)</span>
+                <span class="@MarkerClass(context?.PreviousDayPressure.Level)">@PressureMarker("D", context?.PreviousDayPressure.Level, Dense)</span>
+                <span class="@MarkerClass(context?.PreviousDaySun.Level)">@SunMarker(context?.PreviousDaySun.Level, Dense)</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<DateOnly> Dates { get; set; } = [];
+    [Parameter] public IReadOnlyDictionary<DateOnly, WeatherDayContext> Contexts { get; set; } = new Dictionary<DateOnly, WeatherDayContext>();
+
+    private bool Dense => Dates.Count > 60;
+
+    private static string PressureMarker(string prefix, string? level, bool dense) => level switch
+    {
+        WeatherLevels.Acceptable => dense ? "." : $"{prefix}.",
+        WeatherLevels.Medium => dense ? "~" : $"{prefix}~",
+        WeatherLevels.High => dense ? "!" : $"{prefix}!",
+        _ => dense ? "?" : $"{prefix}?",
+    };
+
+    private static string SunMarker(string? level, bool dense) => level switch
+    {
+        WeatherLevels.Enough => dense ? "." : "S+",
+        WeatherLevels.Middle => dense ? "~" : "S~",
+        WeatherLevels.Low => dense ? "-" : "S-",
+        _ => dense ? "?" : "S?",
+    };
+
+    private static string MarkerClass(string? level) => level switch
+    {
+        WeatherLevels.High or WeatherLevels.Low => "weather-marker weather-marker-danger",
+        WeatherLevels.Medium or WeatherLevels.Middle => "weather-marker weather-marker-warning",
+        WeatherLevels.Acceptable or WeatherLevels.Enough => "weather-marker weather-marker-muted",
+        _ => "weather-marker weather-marker-missing",
+    };
+
+    private static string Title(DateOnly day, WeatherDayContext? context)
+    {
+        if (context is null)
+            return $"{day:dd MMM}: no weather data";
+
+        var night = context.NightPressure is null
+            ? "night pressure unavailable"
+            : $"night pressure {PressureText(context.NightPressure)}";
+        return $"{day:dd MMM}: {night}; previous day sun {SunText(context.PreviousDaySun)}; previous day pressure {PressureText(context.PreviousDayPressure)}";
+    }
+
+    private static string PressureText(WeatherPressureContext item) =>
+        item.PressureChangeHpa.HasValue && item.Level != WeatherLevels.Insufficient
+            ? $"{item.PressureChangeHpa.Value:F1} hPa, {item.Level}"
+            : WeatherLevels.Insufficient;
+
+    private static string SunText(WeatherSunContext item) =>
+        item.SunnyHours.HasValue && item.Level != WeatherLevels.Insufficient
+            ? $"{item.SunnyHours.Value:F1}h, {item.Level}"
+            : WeatherLevels.Insufficient;
+}

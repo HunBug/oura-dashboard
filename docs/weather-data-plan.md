@@ -249,9 +249,196 @@ This belongs closer to phase 2/3, because it joins weather to Oura sleep windows
 - `TemperatureMinC`
 - `HumidityMeanPct`
 - `PressureChangeHpa`
+- `PressureChangeLevel` (`acceptable`, `medium`, `high`, nullable when coverage is weak)
 - `PrecipitationMm`
 - `WindSpeedMeanMs`
 - `CloudCoverMeanPct`
+- `CoveragePct`
+
+### Later derived table: `WeatherDaySummaries`
+
+Daily values should be derived from local-time hourly samples where possible. This table supports daytime weather context without tying the value to a specific sleep session.
+
+- `LocationId`
+- `Source`
+- `Model`
+- `StationId`
+- `Day`
+- `PressureChangeHpa`
+- `PressureChangeLevel` (`acceptable`, `medium`, `high`, nullable when coverage is weak)
+- `SunnyHours`
+- `SunnyHoursLevel` (`enough`, `middle`, `low`, nullable when coverage is weak)
+- `DaylightHoursSampled`
+- `CoveragePct`
+
+## Weather UI Updates
+
+The first weather UI should be descriptive context inside the Oura views, not a separate weather product. It should answer simple questions beside the sleep/recovery data:
+
+- Was pressure stable enough overnight, or did it change enough to plausibly matter?
+- How was the day before that sleep: enough sun, middle sun, or low sun?
+- If day coverage is good enough, did daytime pressure also change acceptably, moderately, or highly?
+
+Weather-specific trend diagrams are still useful later, but the first implementation should make weather visible as an annotation layer for Oura nights.
+
+### Pressure Change Classification
+
+Use hourly pressure data, preferring `pressure_msl` for consistency across elevation and sources. Fall back to `surface_pressure` only if sea-level pressure is unavailable for that source.
+
+For a window, calculate:
+
+- `pressureChangeHpa = max(pressure) - min(pressure)`
+- `coveragePct = valid hourly pressure samples / expected hourly samples`
+- `sourceCount` where values are available, because Open-Meteo and station observations should remain visibly separate until we intentionally choose a primary display source.
+
+Initial thresholds:
+
+| Level | Pressure change in window |
+|---|---:|
+| Acceptable | `< 4 hPa` |
+| Medium | `4-8 hPa` |
+| High | `> 8 hPa` |
+
+Coverage rules:
+
+- Night pressure classification needs at least 70% of expected hourly samples inside the actual Oura sleep-session window.
+- Day pressure classification needs at least 70% of expected local daytime samples.
+- If coverage is below threshold, show `insufficient data` rather than forcing a level.
+- If multiple sources disagree by more than one level, show the primary source level plus a small disagreement marker in diagnostics.
+
+UI placement:
+
+- Add a compact weather context strip to `/night/{name}/{day}` below the RRS/verdict area:
+  - `Night pressure`: `3.2 hPa acceptable`, `6.1 hPa medium`, `10.4 hPa high`, or `insufficient data`.
+  - `Previous day pressure`: same classification for the local daytime window before that sleep.
+  - `Source`: primary source/model, with a diagnostics link when sources disagree.
+- Add the same compact weather context to the last-night cards on `/`, but keep it visually secondary to RRS/HRV/HR/respiration.
+- Add a small day-weather row to `/user/{name}` history rows only after a shared daily query exists. The value is location/day based, so do not duplicate complex source details in each user card.
+- Add the full source-by-source pressure values first to a weather diagnostics section so threshold tuning is easy.
+
+### Daytime Sunny Hours Classification
+
+Use Open-Meteo `sunshine_duration` as the primary source because the current Estonian station import does not collect sunshine elements. Sum hourly `sunshine_duration` over the local daytime window and divide by 3600.
+
+Initial daytime window:
+
+- Prefer astronomical daylight if we later store sunrise/sunset or request daily sunrise/sunset values.
+- Until then, use local `08:00-20:00` as a pragmatic daytime window for UI classification.
+
+Initial thresholds:
+
+| Level | Sunny hours in daytime window |
+|---|---:|
+| Enough | `>= 5 hours` |
+| Middle | `2-5 hours` |
+| Low | `< 2 hours` |
+
+Coverage rules:
+
+- Classify sunny hours only when at least 70% of the daytime hourly samples have `sunshine_duration`.
+- If `sunshine_duration` is missing but `shortwave_radiation` exists, show a diagnostics-only fallback candidate, not a main UI level yet. Radiation needs seasonal calibration before it is a user-facing sunny-hours label.
+
+UI placement:
+
+- Add `Previous day sun` to the `/night/{name}/{day}` weather context strip: `6.3h enough`, `3.1h middle`, `0.8h low`, or `insufficient data`.
+- Add `Sun` to the compact weather context on `/` last-night cards.
+- Add a simple 7/14/30-day mini trend later once enough daily rows exist: sunny-hours level, pressure-change level, and Oura recovery/sleep score columns side by side.
+
+### Night Summary Context
+
+For Oura night pages, define two weather windows:
+
+| Window | Definition | Main labels |
+|---|---|---|
+| Night | actual Oura sleep session start/end in local time | `Night pressure` |
+| Previous day | local daytime before the sleep start, initially `08:00-20:00` on the sleep-start date | `Previous day sun`, `Previous day pressure` |
+
+This avoids confusing the Oura `Day` with the calendar date after waking. If a sleep session starts after midnight, use the daytime window immediately before sleep, not the next calendar day.
+
+The summary should be one small row/strip, not a large weather card:
+
+| Item | Example display | Why |
+|---|---|---|
+| Night pressure | `3.2 hPa acceptable` | direct sleep-window context |
+| Previous day sun | `6.3h enough` | daytime exposure context |
+| Previous day pressure | `5.7 hPa medium` | day stressor/context before sleep |
+
+Recommended visual treatment:
+
+- Use small Bootstrap badges or compact text chips in the existing night header area.
+- Keep labels short and numeric: users should see the level and the actual value.
+- Use muted styling when weather is normal, amber for medium, red for high/low-problem cases.
+- Do not let weather change the RRS color or summary text automatically until we have enough data to trust correlations.
+
+### Trend Chart Pictograms
+
+For trend graphs with dates, add weather pictograms under the chart as a lightweight annotation lane. This is easier than adding more Y-axes and keeps weather visibly attached to the Oura measurements.
+
+Initial implementation:
+
+- Render a narrow row below each dated ApexChart using the same date list as the chart series.
+- Each day gets a fixed-width cell aligned to the chart's date buckets.
+- Use simple symbols plus `title` tooltips first; replace with icons later only if needed.
+
+Suggested pictogram set:
+
+| Signal | Good/low impact | Middle | High/low concern | Missing |
+|---|---|---|---|---|
+| Night pressure | `P.` acceptable | `P~` medium | `P!` high | `P?` |
+| Previous day pressure | `D.` acceptable | `D~` medium | `D!` high | `D?` |
+| Previous day sun | `S+` enough | `S~` middle | `S-` low | `S?` |
+
+If Bootstrap Icons are already added later, these can become icon+color markers:
+
+- pressure acceptable: gauge/check style marker.
+- pressure medium: gauge/warning style marker.
+- pressure high: gauge/exclamation style marker.
+- sun enough/middle/low: sun, sun/cloud, cloud.
+
+Recommended chart placement:
+
+- `/`: add one shared weather annotation lane under the HRV chart and the HR/resp chart. Because weather is location-level, show one lane shared by Boo and Maa instead of duplicating it per user.
+- `/user/{name}`: add the annotation lane under 7/14/30/90-day trend charts.
+- `/compare`: add one shared annotation lane under comparison charts so shared bad nights can be visually checked against shared weather context.
+- `/night/{name}/{day}`: no pictogram lane needed; use the numeric weather context strip instead.
+
+Implementation detail:
+
+- Query a `Dictionary<DateOnly, WeatherDayContext>` for the date range already used by the chart.
+- Use CSS grid with `grid-template-columns: repeat(n, minmax(0, 1fr))`.
+- Keep each marker stable-width and tooltip-rich: `title="Night pressure 6.1 hPa, medium; previous day sun 3.1h, middle"`.
+- Limit visible markers to 30-60 days. For 90-day views, show denser dots/letters or only mark non-normal days.
+- Do not add weather values to chart axes unless the chart is explicitly a weather chart.
+
+### Separate Weather Trend Diagrams
+
+Add separate weather trend diagrams when the user is intentionally inspecting weather stats rather than reading Oura measurements.
+
+Good first weather-only charts:
+
+- Daily sunny hours line/bar chart with enough/middle/low threshold bands.
+- Night pressure change bar chart with acceptable/medium/high colors.
+- Previous day pressure change bar chart.
+- Optional source comparison chart for Open-Meteo vs Estonian station pressure when both exist.
+
+Placement options:
+
+- Start with a collapsible `Weather details` section on `/user/{name}` or `/compare`.
+- Later promote to `/weather` only if it grows beyond contextual support.
+
+These charts should not replace the pictogram lanes. The lanes answer "could weather be part of this Oura night?", while weather diagrams answer "what has the weather been doing over time?"
+
+### Query/API Work Needed
+
+1. Add query methods in `DashboardQueryService` for weather windows:
+   - sleep-session weather summary by user/day/source.
+   - local-day weather summary by day/source.
+   - date-range weather context for trend pictogram lanes.
+2. Keep classification logic in a pure helper, for example `WeatherClassifiers`, with unit tests for threshold edges and low coverage.
+3. Return both raw numeric values and display levels so the UI can show `3.2 hPa acceptable` instead of only a badge.
+4. Add a small `WeatherDayContext`/`WeatherNightContext` view model for UI display.
+5. Add diagnostics output for expected sample count, actual sample count, and missing variables.
+6. Only persist derived tables if query-time calculation becomes slow or if correlation tooling needs indexed historical summaries.
 
 ## Sync Design
 
@@ -296,17 +483,26 @@ Storage policy:
 
 ### Phase 2: Show
 
-1. Add a simple weather diagnostics page.
-2. Show source coverage by day/hour.
-3. Show station distance and selected elements.
-4. Add overlay-ready query methods, but do not build correlation logic yet.
+Status: implemented as contextual Oura UI plus `/sync` diagnostics. Weather-only trend diagrams remain Phase 3/future work.
+
+1. ✅ Add a simple weather diagnostics section on `/sync`.
+2. ✅ Show source/variable coverage by recent Oura weather windows.
+3. ✅ Show selected source/model/station context in diagnostics and chip tooltips.
+4. ✅ Add `WeatherClassifiers` and focused tests for pressure/sun thresholds and low coverage.
+5. ✅ Add `/night/{name}/{day}` weather context strip:
+   - night pressure change.
+   - previous-day sunny hours.
+   - previous-day pressure change when coverage allows.
+6. ✅ Add compact weather context to `/` last-night cards.
+7. ✅ Add overlay-ready query methods and weather pictogram lanes under dated Oura trend charts, but do not build correlation logic yet.
 
 ### Phase 3: Correlate
 
 1. Build night-window weather summaries aligned to Oura sleep session start/end.
 2. Compare multiple sources side by side.
 3. Add lagged variables: same day, previous day, previous 3-day rolling window.
-4. Add correlation/search tools only after enough data coverage is visible.
+4. Add separate weather trend diagrams for sunny hours and pressure changes.
+5. Add correlation/search tools only after enough data coverage is visible.
 
 ## Recommendation
 

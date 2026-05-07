@@ -10,7 +10,8 @@ public class WeatherOptions
     public double Longitude { get; set; } = 26.569136382508024;
     public double? ElevationMeters { get; set; }
     public string Timezone { get; set; } = "Europe/Tallinn";
-    public int SyncIntervalHours { get; set; } = 6;
+    public bool AutoSyncEnabled { get; set; } = true;
+    public int SyncIntervalHours { get; set; } = 24;
     public int SyncLookbackDays { get; set; } = 14;
     public int FullSyncLookbackDays { get; set; } = 3650;
     public WeatherSourceOptions Sources { get; set; } = new();

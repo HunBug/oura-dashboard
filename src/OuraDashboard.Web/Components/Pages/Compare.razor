@@ -38,6 +38,7 @@ else
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                     YValue="r => r.AvgHrv" />
             </ApexChart>
+            <WeatherAnnotationLane Dates="_chartDates" Contexts="_weatherContexts" />
         </div>
     </div>
 
@@ -55,6 +56,7 @@ else
                     XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                     YValue="r => (decimal?)r.HrAbove75Pct" />
             </ApexChart>
+            <WeatherAnnotationLane Dates="_chartDates" Contexts="_weatherContexts" />
         </div>
     </div>
 
@@ -74,6 +76,7 @@ else
                             XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                             YValue="r => (decimal?)r.AvgBreath" />
                     </ApexChart>
+                    <WeatherAnnotationLane Dates="_chartDates" Contexts="_weatherContexts" />
                 </div>
             </div>
         </div>
@@ -91,6 +94,7 @@ else
                             XValue="r => r.Day.ToDateTime(TimeOnly.MinValue)"
                             YValue="r => (decimal?)r.TempDeviation" />
                     </ApexChart>
+                    <WeatherAnnotationLane Dates="_chartDates" Contexts="_weatherContexts" />
                 </div>
             </div>
         </div>
@@ -169,6 +173,8 @@ else
     private List<DateOnly>         _dates   = [];
     private Dictionary<DateOnly, DailyOverviewRow> _booByDay = [];
     private Dictionary<DateOnly, DailyOverviewRow> _maaByDay = [];
+    private Dictionary<DateOnly, WeatherDayContext> _weatherContexts = [];
+    private List<DateOnly> _chartDates = [];
 
     private int    _numDays = 30;
     private int    _correlationNights;
@@ -188,6 +194,11 @@ else
     {
         _allBoo = await Query.GetUserOverviewAsync("Boo", 90);
         _allMaa = await Query.GetUserOverviewAsync("Maa", 90);
+        var allDates = _allBoo.Rows.Select(r => r.Day).Union(_allMaa.Rows.Select(r => r.Day)).OrderBy(d => d).ToList();
+        if (allDates.Count > 0)
+        {
+            _weatherContexts = await Query.GetWeatherDayContextsAsync("Boo", allDates.First(), allDates.Last());
+        }
         ApplyDays();
         _loading = false;
     }
@@ -201,6 +212,7 @@ else
         _booByDay = _booRows.ToDictionary(r => r.Day);
         _maaByDay = _maaRows.ToDictionary(r => r.Day);
         _dates    = _booByDay.Keys.Union(_maaByDay.Keys).OrderByDescending(d => d).ToList();
+        _chartDates = _dates.OrderBy(d => d).ToList();
 
         ComputeMedians();
         ComputeCorrelation();

@@ -61,13 +61,14 @@ Weather is configured separately from Oura users:
   "Latitude": 59.14496602915124,
   "Longitude": 26.569136382508024,
   "Timezone": "Europe/Tallinn",
-  "SyncIntervalHours": 6,
+  "AutoSyncEnabled": true,
+  "SyncIntervalHours": 24,
   "SyncLookbackDays": 14,
   "FullSyncLookbackDays": 3650
 }
 ```
 
-Normal syncs only request hours missing after the latest stored sample per source/model/station. Historical reload uses the configured lookback window but still skips already-collected latest data.
+Normal syncs only request hours missing after the latest stored sample per source/model/station. Historical reload refreshes the full configured lookback window, so it can backfill older missing Open-Meteo rows even after recent scheduled syncs have run.
 
 ### Sources
 
@@ -170,7 +171,7 @@ Thin console app — just parses args and calls `OuraSyncService`.
 
 ### Scheduling options
 
-**Built-in (default, recommended):** `SyncBackgroundService` inside the web app runs on a configurable interval (e.g. `"SyncIntervalMinutes": 60` in appsettings). The "Refresh" button on `/sync` sends a trigger through the `Channel` for an immediate out-of-schedule run. Nothing extra to deploy.
+**Built-in (default, recommended):** `SyncBackgroundService` inside the web app runs on configurable intervals (`Oura:SyncIntervalMinutes`, default 360; `Weather:SyncIntervalHours`, default 24). Scheduled runs can be disabled with `Oura:AutoSyncEnabled=false` or `Weather:AutoSyncEnabled=false`. The refresh/reload buttons on `/sync` send triggers through the `Channel` for immediate manual runs. Nothing extra to deploy.
 
 **Sync.Cli via cron (alternative/additional):** useful for large historical backfills or if you want OS-level scheduling independent of the web process.
 ```
@@ -191,11 +192,11 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 
 | Route | Component | Status |
 |---|---|---|
-| `/` | `Home.razor` | ✅ **Redesigned (Steps 5–7)**: Two-column last-night strip (RRS badge with 14-day personal baseline color, HRV, HR>75%, Restorative, Temp), dual-axis HRV 30-day chart, 4-line combo chart (HR>75% + Resp, both users), pattern callout placeholder |
-| `/user/{name}` | `UserDetail.razor` | ✅ **Redesigned (Step 3)**: 7-stat summary, 2 charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), heatmap table, 7/14/30/90 day toggle, Oura scores toggle |
-| `/night/{name}/{day}` | `NightDetail.razor` | ✅ **Redesigned (Step 2)**: Verdict bar (RRS color + `GenerateSummary`), charts zone, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed), breadcrumb, prev/next nav |
-| `/compare` | `Compare.razor` | ✅ **Redesigned (Step 4)**: Dual Y-axis HRV, clustered bar HR>75%, resp rate + temp charts, zone-alignment correlation badge, heatmap table, 30/60/90 day toggle |
-| `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button, DB totals: Oura days synced per user + weather samples per source with date ranges |
+| `/` | `Home.razor` | ✅ **Redesigned (Steps 5–7 + weather)**: Two-column last-night strip (RRS badge with 14-day personal baseline color, HRV, HR>75%, Restorative, Temp, compact weather context), dual-axis HRV 30-day chart, 4-line combo chart (HR>75% + Resp, both users), shared weather annotation lanes, pattern callouts |
+| `/user/{name}` | `UserDetail.razor` | ✅ **Redesigned (Step 3 + weather)**: 7-stat summary, 2 charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), weather annotation lanes, heatmap table with weather markers, 7/14/30/90 day toggle, Oura scores toggle |
+| `/night/{name}/{day}` | `NightDetail.razor` | ✅ **Redesigned (Step 2 + weather)**: Verdict bar (RRS color + `GenerateSummary`), compact weather context strip, charts zone, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed), breadcrumb, prev/next nav |
+| `/compare` | `Compare.razor` | ✅ **Redesigned (Step 4 + weather)**: Dual Y-axis HRV, clustered bar HR>75%, weather annotation lanes, resp rate + temp charts, zone-alignment correlation badge, heatmap table, 30/60/90 day toggle |
+| `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, refresh/reload buttons, DB totals for Oura/weather with pressure/sun counts, weather context diagnostics |
 | `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Content dissolved into `MetricHelp.razor` `?` popovers (Step 7). Page still exists at `/metrics` as a reference; not linked from primary nav. |
 | `/debug/investigate` | `DebugInvestigate.razor` | ✅ Warning/Error log viewer (live from `AppLogSink`, clearable) + raw DB row inspector (per user/day, grouped by endpoint and source) |
 
@@ -207,6 +208,9 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 - `GetUserOverviewAsync(userName, days)` → `UserOverview` with one `DailyOverviewRow` per calendar day. Start date clamped to user’s earliest session so charts don’t open with empty left-side gaps.
 - `GetNightDetailAsync(userName, day)` → `NightData?` — scalars + intra-night `HrvSeries`/`HeartRateSeries` + sleep stage string + contributors from all 6 tables.
 - `GetNightDaysAsync(userName, days)` → `List<DateOnly>` (descending) — days that have a `long_sleep` session, used for prev/next navigation on the night detail page.
+- `GetNightWeatherContextAsync(userName, day)` → `WeatherNightContext?` — sleep-window pressure change plus previous-day sun and pressure context.
+- `GetWeatherDayContextsAsync(userName, start, end)` → `Dictionary<DateOnly, WeatherDayContext>` — chart annotation lane data.
+- `GetRecentWeatherContextDebugAsync(...)` → recent-night weather diagnostics for `/sync`.
 - Joins: `DailySleep` (score + contributors), `DailyReadinesses` (readiness score, temperature deviation/trend, contributors), `SleepSessions` (HR, HRV, respiratory rate, all duration fields, efficiency, latency, bedtime window, sleep stage string), `DailyStresses`, `DailyActivities`, `DailySpo2s`, `DailyResilienceRecords`.
 - Session preference: `long_sleep` type first, then highest (deep + REM) for the day.
 - Days with no data return a row with all-null metrics (so charts show gaps rather than missing points).
@@ -387,7 +391,7 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 
 ---
 
-## Implementation status (last updated: 2026-04-25)
+## Implementation status (last updated: 2026-05-07)
 
 ### ✅ Done
 
@@ -395,7 +399,7 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - Full sync pipeline (all endpoints, upsert, `SyncBackgroundService`, CLI)
 - End-to-end sync verified with real Oura tokens (90 days, both users)
 - **Blazor UI — all initial pages** built and working
-- **Unit tests** — 25 tests for `NightMetricsCalculator` / RRS formula in `tests/OuraDashboard.Tests` (xUnit)
+- **Unit tests** — 37 tests for `NightMetricsCalculator`, weather provider query builders, and weather classifiers in `tests/OuraDashboard.Tests` (xUnit)
 - **Step 1 — Nav cleanup**: `MetricsGuide` removed from nav; `Counter.razor` + `Weather.razor` deleted
 - **Step 2 — Night page redesign**: `NightDetail.razor` restructured (verdict bar, 3 collapsible metric sections, Oura scores collapsed, daytime collapsed, raw data collapsed, breadcrumb, `GenerateSummary`)
 - **Step 3 — History page**: `UserDetail.razor` updated (2 charts, heatmap table, day toggle, Oura scores toggle, `HrAbove75Pct` + `RestorativeMinutes` added to `DailyOverviewRow`)
@@ -405,11 +409,16 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - **NavMenu**: added “Boo’s History” and “Maa’s History” links.
 - **Step 8 — Home Zone 3**: `BuildCallouts()` in `Home.razor`; 3 pattern detectors: resp-rate linear-slope trend (last 7 nights with data), HRV consecutive-improvement streak (≥3 nights), shared bad-night run (≥2 consecutive nights where both users are in the `danger` zone vs. their 14-night baseline).
 - **Raw export page**: `Raw.razor` at `/raw`; `GetRawExportAsync()` added to `DashboardQueryService` (9 endpoint cases); user + date-range + endpoint selectors; JSON `<pre>` display; copy-to-clipboard via `navigator.clipboard.writeText`; added to NavMenu.
+- **Weather collection**: Open-Meteo historical archive plus Estonian Environment Agency station observations stored in `WeatherHourlySamples`, with provider identity preserved.
+- **Weather UI context**: `WeatherClassifiers`, `WeatherContextStrip`, and `WeatherAnnotationLane` add pressure/sun context to home, night detail, user history, and compare pages without changing Oura score colors.
+- **Weather diagnostics**: `/sync` shows pressure/sun sample counts and recent-night weather context diagnostics using the same query path as the UI chips.
+- **Auto-sync controls**: `Oura:AutoSyncEnabled`, `Oura:SyncIntervalMinutes`, `Weather:AutoSyncEnabled`, and `Weather:SyncIntervalHours` control scheduled sync cadence; manual syncs remain available.
 
 ### 🔲 Still to do
 
 - **Deployment**: systemd unit file + `docker-compose.full.yml` (web + sync in containers)
 - **Custom metrics (trend layer)**: 7-day rolling averages on user overview; autonomic state trend line
+- **Weather trend diagrams/correlation**: weather-only charts and correlation tooling remain future work.
 
 ---
 
@@ -431,5 +440,3 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - Always `dotnet clean` before rebuild if EF Core package version changes (stale binaries cause `MSB3277`)
 - `appsettings.json` at repo root is loaded by both Web and Sync.Cli (both use `Host.CreateDefaultBuilder` / `WebApplication.CreateBuilder`)
 - `appsettings.Local.json` is gitignored — real tokens go there
-
-

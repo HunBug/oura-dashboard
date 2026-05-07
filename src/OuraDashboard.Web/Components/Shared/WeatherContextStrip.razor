@@ -1,0 +1,68 @@
+@if (Context is not null)
+{
+    <div class="weather-strip">
+        <div class="@ChipClass(Context.NightPressure.Level)" title="@PressureTitle(Context.NightPressure)">
+            <span class="weather-label">@NightPressureLabel</span>
+            <span>@PressureText(Context.NightPressure)</span>
+            @if (Context.NightPressure.HasDisagreement)
+            {
+                <span title="Weather sources disagree by more than one level">!</span>
+            }
+        </div>
+        <div class="@ChipClass(Context.PreviousDaySun.Level)" title="@SunTitle(Context.PreviousDaySun)">
+            <span class="weather-label">@SunLabel</span>
+            <span>@SunText(Context.PreviousDaySun)</span>
+        </div>
+        <div class="@ChipClass(Context.PreviousDayPressure.Level)" title="@PressureTitle(Context.PreviousDayPressure)">
+            <span class="weather-label">@DayPressureLabel</span>
+            <span>@PressureText(Context.PreviousDayPressure)</span>
+            @if (Context.PreviousDayPressure.HasDisagreement)
+            {
+                <span title="Weather sources disagree by more than one level">!</span>
+            }
+        </div>
+        @if (ShowSource && PrimarySource is not null)
+        {
+            <div class="weather-chip weather-chip-muted">
+                <span class="weather-label">Source</span>
+                <span>@PrimarySource</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public WeatherNightContext? Context { get; set; }
+    [Parameter] public bool ShowSource { get; set; }
+    [Parameter] public string NightPressureLabel { get; set; } = "Night pressure";
+    [Parameter] public string SunLabel { get; set; } = "Previous day sun";
+    [Parameter] public string DayPressureLabel { get; set; } = "Previous day pressure";
+
+    private string? PrimarySource => Context?.NightPressure.SourceLabel
+        ?? Context?.PreviousDaySun.SourceLabel
+        ?? Context?.PreviousDayPressure.SourceLabel;
+
+    private static string PressureText(WeatherPressureContext item) =>
+        item.PressureChangeHpa.HasValue && item.Level != WeatherLevels.Insufficient
+            ? $"{item.PressureChangeHpa.Value:F1} hPa {item.Level}"
+            : WeatherLevels.Insufficient;
+
+    private static string SunText(WeatherSunContext item) =>
+        item.SunnyHours.HasValue && item.Level != WeatherLevels.Insufficient
+            ? $"{item.SunnyHours.Value:F1}h {item.Level}"
+            : WeatherLevels.Insufficient;
+
+    private static string PressureTitle(WeatherPressureContext item) =>
+        $"{PressureText(item)}; {item.ValidSamples}/{item.ExpectedSamples} hourly samples ({item.CoveragePct:F0}%); {item.SourceLabel ?? "no source"}";
+
+    private static string SunTitle(WeatherSunContext item) =>
+        $"{SunText(item)}; {item.ValidSamples}/{item.ExpectedSamples} hourly samples ({item.CoveragePct:F0}%); {item.SourceLabel ?? "no source"}";
+
+    private static string ChipClass(string level) => level switch
+    {
+        WeatherLevels.High or WeatherLevels.Low => "weather-chip weather-chip-danger",
+        WeatherLevels.Medium or WeatherLevels.Middle => "weather-chip weather-chip-warning",
+        WeatherLevels.Acceptable or WeatherLevels.Enough => "weather-chip weather-chip-muted",
+        _ => "weather-chip weather-chip-missing",
+    };
+}
