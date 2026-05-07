@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OuraDashboard.Data;
+using OuraDashboard.Data.Entities;
 using OuraDashboard.Sync;
 
 namespace OuraDashboard.Web.Services;
@@ -19,10 +20,24 @@ public record LiveOuraDebugRow(
     string Status,
     string RawJson);
 
+public record WeatherDbDebugRow(
+    string Source,
+    string Key,
+    string Extracted,
+    string RawJson);
+
+public record LiveWeatherDebugRow(
+    string Provider,
+    string Request,
+    string Status,
+    string Summary,
+    string RawJson);
+
 public class DebugInvestigationService(
     OuraDbContext db,
     IHttpClientFactory httpFactory,
-    IOptions<OuraOptions> options)
+    IOptions<OuraOptions> options,
+    IOptions<WeatherOptions> weatherOptions)
 {
     private static readonly JsonSerializerOptions PrettyJsonOptions = new() { WriteIndented = true };
 
@@ -155,6 +170,94 @@ public class DebugInvestigationService(
         return rows;
     }
 
+    public async Task<List<WeatherDbDebugRow>> GetStoredWeatherRowsAsync(DateOnly day, CancellationToken ct = default)
+    {
+        var config = weatherOptions.Value;
+        var startLocal = day.ToDateTime(TimeOnly.MinValue);
+        var endLocal = day.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+        var rows = await db.WeatherHourlySamples
+            .Include(x => x.WeatherLocation)
+            .Include(x => x.WeatherStation)
+            .Where(x => x.WeatherLocation.Name == config.LocationName
+                && x.TimestampLocal >= startLocal
+                && x.TimestampLocal < endLocal)
+            .OrderBy(x => x.TimestampUtc)
+            .ThenBy(x => x.Source)
+            .ThenBy(x => x.WeatherStationId)
+            .Select(x => new WeatherDbDebugRow(
+                x.Source,
+                $"{x.TimestampLocal:yyyy-MM-dd HH:mm} local / {x.TimestampUtc:u} / {(x.Model ?? (x.WeatherStation == null ? "no station" : x.WeatherStation.StationCode + " " + x.WeatherStation.ElementCode))}",
+                $"temp={x.TemperatureC}; rh={x.RelativeHumidityPct}; precipitation={x.PrecipitationMm}; pressure={x.PressureMslHpa}; wind={x.WindSpeedMs}; station={(x.WeatherStation == null ? "" : x.WeatherStation.Name)}",
+                x.RawJson.RootElement.ToString()))
+            .ToListAsync(ct);
+
+        return rows.Select(r => r with { RawJson = Pretty(r.RawJson) }).ToList();
+    }
+
+    public async Task<List<LiveWeatherDebugRow>> FetchLiveWeatherRowsAsync(DateOnly day, CancellationToken ct = default)
+    {
+        var config = weatherOptions.Value;
+        var timezone = OuraTimeZone.Resolve(config.Timezone);
+        var startLocal = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), timezone.GetUtcOffset(day.ToDateTime(TimeOnly.MinValue)));
+        var endLocal = startLocal.AddDays(1).AddHours(-1);
+        var location = new WeatherLocation
+        {
+            Name = config.LocationName,
+            Latitude = config.Latitude,
+            Longitude = config.Longitude,
+            ElevationMeters = config.ElevationMeters,
+            Timezone = config.Timezone
+        };
+
+        var rows = new List<LiveWeatherDebugRow>();
+
+        if (config.Sources.OpenMeteo.Enabled)
+        {
+            var request = WeatherProviderQueries.BuildOpenMeteoArchivePath(
+                location,
+                config,
+                startLocal.ToUniversalTime(),
+                endLocal.ToUniversalTime());
+            var http = httpFactory.CreateClient("OpenMeteoApi");
+            rows.Add(await FetchWeatherAsync(http, "open-meteo archive", request, SummarizeOpenMeteo, ct));
+        }
+
+        if (config.Sources.EstonianEnvironmentAgency.Enabled)
+        {
+            var http = httpFactory.CreateClient("EstonianEnvironmentAgencyApi");
+            foreach (var elementCode in config.Sources.EstonianEnvironmentAgency.ElementCodes.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var metadataRequest = WeatherProviderQueries.BuildEstonianStationMetadataPath(
+                    config.Sources.EstonianEnvironmentAgency.StationCodes,
+                    elementCode);
+                var metadata = await FetchWeatherAsync(http, $"estonian metadata {elementCode}", metadataRequest, SummarizeJsonArray, ct);
+                rows.Add(metadata);
+
+                var stationCode = TryClosestStationCode(metadata.RawJson, config.Latitude, config.Longitude);
+                if (stationCode is null)
+                {
+                    rows.Add(new LiveWeatherDebugRow(
+                        $"estonian hourly {elementCode}",
+                        "not requested",
+                        "Skipped",
+                        "No station code found in metadata response.",
+                        ""));
+                    continue;
+                }
+
+                var request = WeatherProviderQueries.BuildEstonianHourlyPath(
+                    stationCode,
+                    elementCode,
+                    day.Year,
+                    day.Month);
+                rows.Add(await FetchWeatherAsync(http, $"estonian hourly {stationCode}/{elementCode}", request, SummarizeEstonianHourly, ct));
+            }
+        }
+
+        return rows;
+    }
+
     private static async Task<LiveOuraDebugRow> FetchAsync(HttpClient http, string endpoint, string request, CancellationToken ct)
     {
         try
@@ -170,6 +273,100 @@ public class DebugInvestigationService(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new LiveOuraDebugRow(endpoint, request, "Fetch failed", ex.Message);
+        }
+    }
+
+    private static async Task<LiveWeatherDebugRow> FetchWeatherAsync(
+        HttpClient http,
+        string provider,
+        string request,
+        Func<string, string> summarize,
+        CancellationToken ct)
+    {
+        try
+        {
+            using var response = await http.GetAsync(request, ct);
+            var body = await response.Content.ReadAsStringAsync(ct);
+            return new LiveWeatherDebugRow(
+                provider,
+                http.BaseAddress is null ? request : new Uri(http.BaseAddress, request).ToString(),
+                $"{(int)response.StatusCode} {response.ReasonPhrase}",
+                summarize(body),
+                Pretty(body));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new LiveWeatherDebugRow(provider, request, "Fetch failed", ex.Message, ex.ToString());
+        }
+    }
+
+    private static string SummarizeOpenMeteo(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("hourly", out var hourly))
+                return "No hourly property in response.";
+
+            var count = hourly.TryGetProperty("time", out var time) && time.ValueKind == JsonValueKind.Array
+                ? time.GetArrayLength()
+                : 0;
+            var variables = hourly.EnumerateObject().Count(x => x.Value.ValueKind == JsonValueKind.Array);
+            return $"hourly_times={count}; hourly_arrays={variables}";
+        }
+        catch (JsonException ex)
+        {
+            return $"Invalid JSON: {ex.Message}";
+        }
+    }
+
+    private static string SummarizeEstonianHourly(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return $"Root kind={doc.RootElement.ValueKind}; expected array.";
+
+            var count = doc.RootElement.GetArrayLength();
+            var first = count > 0 ? doc.RootElement[0].GetRawText() : "empty";
+            return $"rows={count}; first={first}";
+        }
+        catch (JsonException ex)
+        {
+            return $"Invalid JSON: {ex.Message}";
+        }
+    }
+
+    private static string SummarizeJsonArray(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Array
+                ? $"rows={doc.RootElement.GetArrayLength()}"
+                : $"Root kind={doc.RootElement.ValueKind}; expected array.";
+        }
+        catch (JsonException ex)
+        {
+            return $"Invalid JSON: {ex.Message}";
+        }
+    }
+
+    private static string? TryClosestStationCode(string json, double latitude, double longitude)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var row = WeatherProviderQueries.FindClosestStationRow(doc.RootElement, latitude, longitude);
+            if (row is null) return null;
+            return row.Value.TryGetProperty("jaam_kood", out var stationCode)
+                ? stationCode.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 

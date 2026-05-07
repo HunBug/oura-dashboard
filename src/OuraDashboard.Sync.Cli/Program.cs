@@ -9,6 +9,8 @@ using OuraDashboard.Sync;
 // ── Args ──────────────────────────────────────────────────────────────────────
 int days = 30;
 bool applyMigrations = false;
+bool syncOura = true;
+bool syncWeather = false;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -16,6 +18,16 @@ for (int i = 0; i < args.Length; i++)
         days = d;
     if (args[i] == "--migrate")
         applyMigrations = true;
+    if (args[i] == "--weather")
+    {
+        syncWeather = true;
+        syncOura = false;
+    }
+    if (args[i] == "--all")
+    {
+        syncWeather = true;
+        syncOura = true;
+    }
 }
 
 // ── Host ──────────────────────────────────────────────────────────────────────
@@ -30,6 +42,7 @@ var host = Host.CreateDefaultBuilder(args)
             ?? throw new InvalidOperationException("ConnectionStrings:Default is required");
 
         services.Configure<OuraOptions>(ctx.Configuration.GetSection(OuraOptions.SectionName));
+        services.Configure<WeatherOptions>(ctx.Configuration.GetSection(WeatherOptions.SectionName));
         services.AddOuraDatabase(connectionString);
         services.AddOuraSync();
 
@@ -50,27 +63,49 @@ if (applyMigrations)
 var logger = host.Services.GetRequiredService<ILogger<Program>>();
 var options = host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<OuraOptions>>().Value;
 
-if (options.Users.Count == 0)
+if (syncOura && options.Users.Count == 0)
 {
     logger.LogError("No users configured. Check Oura:Users in appsettings.Local.json");
     return 1;
 }
 
-logger.LogInformation("Starting sync for {Count} user(s), {Days} day(s) back", options.Users.Count, days);
+logger.LogInformation("Starting sync. Oura={Oura}, Weather={Weather}, {Days} day(s) back", syncOura, syncWeather, days);
 
 int exitCode = 0;
 using var syncScope = host.Services.CreateScope();
-var syncService = syncScope.ServiceProvider.GetRequiredService<OuraSyncService>();
 
-foreach (var user in options.Users)
+if (syncOura)
 {
-    var result = await syncService.SyncUserAsync(user.Name, days);
+    var syncService = syncScope.ServiceProvider.GetRequiredService<OuraSyncService>();
+
+    foreach (var user in options.Users)
+    {
+        var result = await syncService.SyncUserAsync(user.Name, days);
+
+        Console.WriteLine(
+            $"[{user.Name}] sleep={result.DailySleepCount} sessions={result.SleepSessionCount} " +
+            $"readiness={result.ReadinessCount} hr={result.HeartRateSampleCount} " +
+            $"stress={result.DailyStressCount} activity={result.DailyActivityCount} vo2={result.Vo2MaxCount} " +
+            $"spo2={result.Spo2Count} resilience={result.ResilienceCount} workout={result.WorkoutCount}");
+
+        if (result.Errors.Count > 0)
+        {
+            foreach (var err in result.Errors)
+                logger.LogWarning("  {Error}", err);
+            exitCode = 1;
+        }
+    }
+}
+
+if (syncWeather)
+{
+    var weatherService = syncScope.ServiceProvider.GetRequiredService<WeatherSyncService>();
+    var result = await weatherService.SyncAsync(days);
 
     Console.WriteLine(
-        $"[{user.Name}] sleep={result.DailySleepCount} sessions={result.SleepSessionCount} " +
-        $"readiness={result.ReadinessCount} hr={result.HeartRateSampleCount} " +
-        $"stress={result.DailyStressCount} activity={result.DailyActivityCount} vo2={result.Vo2MaxCount} " +
-        $"spo2={result.Spo2Count} resilience={result.ResilienceCount} workout={result.WorkoutCount}");
+        $"[weather:{result.LocationName}] openMeteo={result.OpenMeteoCount} " +
+        $"estonian={result.EstonianAgencyCount} stations={result.StationCount} " +
+        $"range={result.StartUtc:u}..{result.EndUtc:u}");
 
     if (result.Errors.Count > 0)
     {
@@ -81,4 +116,3 @@ foreach (var user in options.Users)
 }
 
 return exitCode;
-

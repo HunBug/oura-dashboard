@@ -31,6 +31,14 @@
         <button class="btn btn-sm btn-outline-secondary" @onclick="LoadAllAsync" disabled="@(_loadingStored || _loadingLive)">
             Load both
         </button>
+        <button class="btn btn-sm btn-outline-success" @onclick="LoadStoredWeatherAsync" disabled="@_loadingWeatherStored">
+            @if (_loadingWeatherStored) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+            Weather DB
+        </button>
+        <button class="btn btn-sm btn-outline-success" @onclick="FetchLiveWeatherAsync" disabled="@_loadingWeatherLive">
+            @if (_loadingWeatherLive) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+            Fetch weather live
+        </button>
     </div>
 </div>
 
@@ -83,14 +91,65 @@
     </div>
 </div>
 
+<hr class="my-4" />
+
+<div class="row g-4">
+    <div class="col-12 col-xl-6">
+        <h5 class="mb-2">Stored Weather DB Data</h5>
+        @if (_weatherStoredRows is null)
+        {
+            <p class="text-muted small">No stored weather data loaded.</p>
+        }
+        else if (_weatherStoredRows.Count == 0)
+        {
+            <div class="alert alert-warning small">No stored weather DB rows found for @DayOnly.</div>
+        }
+        else
+        {
+            @foreach (var row in _weatherStoredRows)
+            {
+                <details class="mb-3">
+                    <summary class="fw-semibold">@row.Source <span class="text-muted fw-normal small">@row.Key</span></summary>
+                    <div class="small text-muted my-2">@row.Extracted</div>
+                    <textarea class="form-control font-monospace bg-body-secondary" rows="10" readonly>@row.RawJson</textarea>
+                </details>
+            }
+        }
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <h5 class="mb-2">Live Weather Fetch</h5>
+        @if (_weatherLiveRows is null)
+        {
+            <p class="text-muted small">No live weather data loaded.</p>
+        }
+        else
+        {
+            @foreach (var row in _weatherLiveRows)
+            {
+                <details class="mb-3" open>
+                    <summary class="fw-semibold">@row.Provider <span class="text-muted fw-normal small">@row.Status</span></summary>
+                    <div class="small text-muted my-2 text-break">@row.Request</div>
+                    <div class="small text-muted my-2">@row.Summary</div>
+                    <textarea class="form-control font-monospace bg-body-secondary" rows="12" readonly>@row.RawJson</textarea>
+                </details>
+            }
+        }
+    </div>
+</div>
+
 @code {
     private string _user = "Boo";
     private DateTime _day;
     private bool _loadingStored;
     private bool _loadingLive;
+    private bool _loadingWeatherStored;
+    private bool _loadingWeatherLive;
     private string? _error;
     private List<DbDebugRow>? _storedRows;
     private List<LiveOuraDebugRow>? _liveRows;
+    private List<WeatherDbDebugRow>? _weatherStoredRows;
+    private List<LiveWeatherDebugRow>? _weatherLiveRows;
 
     private DateOnly DayOnly => DateOnly.FromDateTime(_day);
 
@@ -138,6 +197,42 @@
         finally
         {
             _loadingLive = false;
+        }
+    }
+
+    private async Task LoadStoredWeatherAsync()
+    {
+        _error = null;
+        _loadingWeatherStored = true;
+        try
+        {
+            _weatherStoredRows = await DebugService.GetStoredWeatherRowsAsync(DayOnly);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Weather DB debug failed: {ex.Message}";
+        }
+        finally
+        {
+            _loadingWeatherStored = false;
+        }
+    }
+
+    private async Task FetchLiveWeatherAsync()
+    {
+        _error = null;
+        _loadingWeatherLive = true;
+        try
+        {
+            _weatherLiveRows = await DebugService.FetchLiveWeatherRowsAsync(DayOnly);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Live weather fetch failed: {ex.Message}";
+        }
+        finally
+        {
+            _loadingWeatherLive = false;
         }
     }
 }

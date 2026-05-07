@@ -46,6 +46,47 @@ OuraDashboard.sln
 └── appsettings.example.json
 ```
 
+## Weather data
+
+Historical weather collection is implemented as a location-based sync path alongside Oura sync.
+
+### Configuration
+
+Weather is configured separately from Oura users:
+
+```json
+"Weather": {
+  "Enabled": true,
+  "LocationName": "Roela",
+  "Latitude": 59.14496602915124,
+  "Longitude": 26.569136382508024,
+  "Timezone": "Europe/Tallinn",
+  "SyncIntervalHours": 6,
+  "SyncLookbackDays": 14,
+  "FullSyncLookbackDays": 3650
+}
+```
+
+Normal syncs only request hours missing after the latest stored sample per source/model/station. Historical reload uses the configured lookback window but still skips already-collected latest data.
+
+### Sources
+
+| Source | Status | Notes |
+|---|---|---|
+| Open-Meteo historical archive | Implemented | Coordinate-based hourly data, no token. Default model is `best_match`. |
+| Estonian Environment Agency open data | Implemented | Official station observations from `keskkonnaandmed.envir.ee`, using station metadata plus hourly climate table. |
+| Meteostat | Planned only | Keep as a later optional fallback if gaps remain. |
+
+### Tables
+
+| Table | Key columns |
+|---|---|
+| `WeatherLocations` | configured name, lat/lon, timezone, raw config JSON |
+| `WeatherStations` | source, station code, element code, distance from configured location, raw station JSON |
+| `WeatherHourlySamples` | source/model/station/timestamp plus typed weather scalar columns and raw JSON |
+
+Weather data intentionally keeps provider identity explicit. Open-Meteo model data and official station observations are not merged into a single value.
+
 ---
 
 ## Data layer (`OuraDashboard.Data`)
@@ -384,6 +425,5 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - Always `dotnet clean` before rebuild if EF Core package version changes (stale binaries cause `MSB3277`)
 - `appsettings.json` at repo root is loaded by both Web and Sync.Cli (both use `Host.CreateDefaultBuilder` / `WebApplication.CreateBuilder`)
 - `appsettings.Local.json` is gitignored — real tokens go there
-
 
 

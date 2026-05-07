@@ -11,6 +11,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.Configure<OuraOptions>(builder.Configuration.GetSection(OuraOptions.SectionName));
+builder.Services.Configure<WeatherOptions>(builder.Configuration.GetSection(WeatherOptions.SectionName));
 builder.Services.AddOuraDatabase(builder.Configuration.GetConnectionString("Default")!);
 builder.Services.AddOuraSync(addBackgroundService: true);
 builder.Services.AddApexCharts();

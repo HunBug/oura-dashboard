@@ -532,6 +532,207 @@ namespace OuraDashboard.Data.Migrations
                     b.ToTable("Vo2Maxes");
                 });
 
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherHourlySample", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<double?>("ApparentTemperatureC")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("CloudCoverPct")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("DewPointC")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<double?>("PrecipitationMm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("PressureMslHpa")
+                        .HasColumnType("double precision");
+
+                    b.Property<JsonDocument>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<double?>("RainMm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("RelativeHumidityPct")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("ShortwaveRadiationWm2")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("SnowDepthM")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("SnowfallCm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("SoilMoisture0To7Cm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("SoilTemperature0To7CmC")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<double?>("SunshineDurationSec")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("SurfacePressureHpa")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("TemperatureC")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("TimestampLocal")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTimeOffset>("TimestampUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WeatherLocationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("WeatherStationId")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("WindDirectionDeg")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("WindGustMs")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("WindSpeedMs")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WeatherLocationId", "TimestampUtc");
+
+                    b.HasIndex("WeatherLocationId", "Source", "Model", "WeatherStationId", "TimestampUtc")
+                        .IsUnique();
+
+                    b.HasIndex("WeatherStationId");
+
+                    b.ToTable("WeatherHourlySamples");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherLocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<double?>("ElevationMeters")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<JsonDocument>("RawJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Timezone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("WeatherLocations");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherStation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<double?>("DistanceKm")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("ElevationMeters")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ElementCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ElementName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<DateTimeOffset?>("ObservationPeriodEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ObservationPeriodStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<JsonDocument>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("StationCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("WeatherLocationId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WeatherLocationId", "Source", "StationCode", "ElementCode")
+                        .IsUnique();
+
+                    b.ToTable("WeatherStations");
+                });
+
             modelBuilder.Entity("OuraDashboard.Data.Entities.Workout", b =>
                 {
                     b.Property<int>("Id")
@@ -699,6 +900,34 @@ namespace OuraDashboard.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherHourlySample", b =>
+                {
+                    b.HasOne("OuraDashboard.Data.Entities.WeatherLocation", "WeatherLocation")
+                        .WithMany("HourlySamples")
+                        .HasForeignKey("WeatherLocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OuraDashboard.Data.Entities.WeatherStation", "WeatherStation")
+                        .WithMany("HourlySamples")
+                        .HasForeignKey("WeatherStationId");
+
+                    b.Navigation("WeatherLocation");
+
+                    b.Navigation("WeatherStation");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherStation", b =>
+                {
+                    b.HasOne("OuraDashboard.Data.Entities.WeatherLocation", "WeatherLocation")
+                        .WithMany("Stations")
+                        .HasForeignKey("WeatherLocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WeatherLocation");
+                });
+
             modelBuilder.Entity("OuraDashboard.Data.Entities.Workout", b =>
                 {
                     b.HasOne("OuraDashboard.Data.Entities.OuraUser", "User")
@@ -733,6 +962,18 @@ namespace OuraDashboard.Data.Migrations
                     b.Navigation("Vo2Maxes");
 
                     b.Navigation("Workouts");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherLocation", b =>
+                {
+                    b.Navigation("HourlySamples");
+
+                    b.Navigation("Stations");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.WeatherStation", b =>
+                {
+                    b.Navigation("HourlySamples");
                 });
 #pragma warning restore 612, 618
         }

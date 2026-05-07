@@ -16,8 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OuraDashboard.Sync\OuraDashboard.Sync.csproj" />
-    <ProjectReference Include="..\OuraDashboard.Data\OuraDashboard.Data.csproj" />
+    <ProjectReference Include="..\OuraDashboard.Sync\OuraDashboard.Sync.csproj" SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
 </Project>

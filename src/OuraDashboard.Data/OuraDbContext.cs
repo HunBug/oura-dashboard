@@ -17,6 +17,9 @@ public class OuraDbContext(DbContextOptions<OuraDbContext> options) : DbContext(
     public DbSet<DailySpo2> DailySpo2s => Set<DailySpo2>();
     public DbSet<DailyResilience> DailyResilienceRecords => Set<DailyResilience>();
     public DbSet<Workout> Workouts => Set<Workout>();
+    public DbSet<WeatherLocation> WeatherLocations => Set<WeatherLocation>();
+    public DbSet<WeatherStation> WeatherStations => Set<WeatherStation>();
+    public DbSet<WeatherHourlySample> WeatherHourlySamples => Set<WeatherHourlySample>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -143,6 +146,41 @@ public class OuraDbContext(DbContextOptions<OuraDbContext> options) : DbContext(
             e.Property(x => x.Source).HasMaxLength(50);
             e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
             e.HasOne(x => x.User).WithMany(u => u.Workouts).HasForeignKey(x => x.UserId);
+        });
+
+        model.Entity<WeatherLocation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Name).IsUnique();
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Timezone).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RawJson).HasColumnType("jsonb");
+        });
+
+        model.Entity<WeatherStation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.WeatherLocationId, x.Source, x.StationCode, x.ElementCode }).IsUnique();
+            e.Property(x => x.Source).HasMaxLength(60).IsRequired();
+            e.Property(x => x.StationCode).HasMaxLength(80).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            e.Property(x => x.ElementCode).HasMaxLength(40);
+            e.Property(x => x.ElementName).HasMaxLength(200);
+            e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
+            e.HasOne(x => x.WeatherLocation).WithMany(x => x.Stations).HasForeignKey(x => x.WeatherLocationId);
+        });
+
+        model.Entity<WeatherHourlySample>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.WeatherLocationId, x.Source, x.Model, x.WeatherStationId, x.TimestampUtc }).IsUnique();
+            e.HasIndex(x => new { x.WeatherLocationId, x.TimestampUtc });
+            e.Property(x => x.Source).HasMaxLength(60).IsRequired();
+            e.Property(x => x.Model).HasMaxLength(80);
+            e.Property(x => x.TimestampLocal).HasColumnType("timestamp without time zone");
+            e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
+            e.HasOne(x => x.WeatherLocation).WithMany(x => x.HourlySamples).HasForeignKey(x => x.WeatherLocationId);
+            e.HasOne(x => x.WeatherStation).WithMany(x => x.HourlySamples).HasForeignKey(x => x.WeatherStationId);
         });
     }
 }

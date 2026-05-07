@@ -71,6 +71,9 @@ docs/
 | `DailyResilienceRecords` | `UserId`, `Day`, `Level` (string), `SleepRecovery`, `DaytimeRecovery`, `Stress`, `RawJson` |
 | `Workouts` | `UserId`, `Day`, `Activity`, `Calories`, `Distance`, `Intensity`, `RawJson` |
 | `DailyHrvs` | **Dead table** — `daily_hrv` endpoint does not exist in the Oura API |
+| `WeatherLocations` | configured weather point, currently Roela at `59.14496602915124, 26.569136382508024` |
+| `WeatherStations` | official/source station metadata by source + station + element |
+| `WeatherHourlySamples` | hourly weather values by location + source + model/station + UTC timestamp, with raw JSON |
 
 ## Key service types
 
@@ -88,7 +91,13 @@ No DB queries, no DI. Fields:
 - `HrvEarlyHalfAvg`, `HrvLateHalfAvg`, `HrvPeak`, HRV distribution buckets
 - `RestorativeMinutes`
 
-**`SyncBackgroundService`** (hosted in Web) — timer + Channel trigger. Two-path: periodic (hourly) + `ISyncTrigger.RequestSync()` from UI.
+**`SyncBackgroundService`** (hosted in Web) — timer + Channel trigger. Handles Oura sync plus weather sync. Oura defaults hourly; weather defaults every 6 hours. `/sync` has separate refresh and historical reload buttons.
+
+**`WeatherSyncService`** — location-based historical weather collection.
+- Open-Meteo archive API, no token, default model `best_match`.
+- Estonian Environment Agency open data, station metadata plus hourly climate observations.
+- Normal syncs skip already-collected hours per source/model/station.
+- CLI: `--weather --days N` for weather only, `--all --days N` for Oura + weather.
 
 ## Non-obvious rules & gotchas
 

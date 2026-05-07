@@ -20,8 +20,23 @@ public static class ServiceCollectionExtensions
             client.DefaultRequestHeaders.Add("Accept", "application/json");
         });
 
+        services.AddHttpClient("OpenMeteoApi", client =>
+        {
+            client.BaseAddress = new Uri("https://archive-api.open-meteo.com/");
+            client.Timeout = TimeSpan.FromSeconds(60);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
+        services.AddHttpClient("EstonianEnvironmentAgencyApi", client =>
+        {
+            client.BaseAddress = new Uri("https://keskkonnaandmed.envir.ee/");
+            client.Timeout = TimeSpan.FromSeconds(60);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
         // OuraSyncService is scoped — one per operation
         services.AddScoped<OuraSyncService>();
+        services.AddScoped<WeatherSyncService>();
 
         if (addBackgroundService)
         {
