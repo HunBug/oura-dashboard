@@ -195,8 +195,9 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 | `/user/{name}` | `UserDetail.razor` | ✅ **Redesigned (Step 3)**: 7-stat summary, 2 charts (HRV+Resp dual-axis; HR>75% bar + Restorative line), heatmap table, 7/14/30/90 day toggle, Oura scores toggle |
 | `/night/{name}/{day}` | `NightDetail.razor` | ✅ **Redesigned (Step 2)**: Verdict bar (RRS color + `GenerateSummary`), charts zone, 3 collapsible metric sections, Oura scores (collapsed), daytime (collapsed), raw data (collapsed), breadcrumb, prev/next nav |
 | `/compare` | `Compare.razor` | ✅ **Redesigned (Step 4)**: Dual Y-axis HRV, clustered bar HR>75%, resp rate + temp charts, zone-alignment correlation badge, heatmap table, 30/60/90 day toggle |
-| `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button |
+| `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, "Refresh" button, DB totals: Oura days synced per user + weather samples per source with date ranges |
 | `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Content dissolved into `MetricHelp.razor` `?` popovers (Step 7). Page still exists at `/metrics` as a reference; not linked from primary nav. |
+| `/debug/investigate` | `DebugInvestigate.razor` | ✅ Warning/Error log viewer (live from `AppLogSink`, clearable) + raw DB row inspector (per user/day, grouped by endpoint and source) |
 
 
 
@@ -232,6 +233,11 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 |---|---|---|
 | `UserCard` | `Components/Pages/` | Home page card per user |
 | `StatBox` | `Components/Shared/` | Reusable large-value + small-label tile |
+
+### Nav sidebar (`NavMenu.razor`)
+
+- Injects `AppLogSink` and shows a ⚠ alert badge linking to `/debug/investigate` whenever there are captured errors or warnings.
+- Footer shows `BuildInfo.Version` and `BuildInfo.BuildTime` (UTC) so you can always tell which build is running.
 
 ### Known Oura API notes (from live data)
 

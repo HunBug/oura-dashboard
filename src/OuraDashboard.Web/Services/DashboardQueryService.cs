@@ -84,6 +84,9 @@ public record NightData(
     List<SamplePoint> HrvSeries,
     List<SamplePoint> HeartRateSeries);
 
+public record OuraDbStats(string UserName, int Days, DateOnly? EarliestDay, DateOnly? LatestDay);
+public record WeatherDbSourceStats(string Source, int Count, DateTimeOffset? EarliestUtc, DateTimeOffset? LatestUtc);
+
 public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> options)
 {
     /// <summary>
@@ -405,5 +408,37 @@ public class DashboardQueryService(OuraDbContext db, IOptions<OuraOptions> optio
 
             _ => []
         };
+    }
+
+    public async Task<List<OuraDbStats>> GetOuraDbStatsAsync(CancellationToken ct = default)
+    {
+        var sleepStats = await db.DailySleeps
+            .GroupBy(x => x.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count(), Min = g.Min(x => x.Day), Max = g.Max(x => x.Day) })
+            .ToListAsync(ct);
+
+        var users = await db.Users.OrderBy(u => u.Name).ToListAsync(ct);
+        return users.Select(u =>
+        {
+            var s = sleepStats.FirstOrDefault(x => x.UserId == u.Id);
+            return new OuraDbStats(u.Name, s?.Count ?? 0, s?.Min, s?.Max);
+        }).ToList();
+    }
+
+    public async Task<List<WeatherDbSourceStats>> GetWeatherDbStatsAsync(CancellationToken ct = default)
+    {
+        var rows = await db.WeatherHourlySamples
+            .GroupBy(x => x.Source)
+            .Select(g => new
+            {
+                Source = g.Key,
+                Count = g.Count(),
+                Min = g.Min(x => (DateTimeOffset?)x.TimestampUtc),
+                Max = g.Max(x => (DateTimeOffset?)x.TimestampUtc)
+            })
+            .OrderBy(x => x.Source)
+            .ToListAsync(ct);
+
+        return rows.Select(r => new WeatherDbSourceStats(r.Source, r.Count, r.Min, r.Max)).ToList();
     }
 }

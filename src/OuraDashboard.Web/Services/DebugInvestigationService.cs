@@ -50,86 +50,86 @@ public class DebugInvestigationService(
 
         var rows = new List<DbDebugRow>();
 
-        rows.AddRange(await db.DailySleeps
+        rows.AddRange((await db.DailySleeps
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.Id)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "daily_sleep",
                 $"{x.Day:yyyy-MM-dd} / {x.OuraId}",
                 $"score={x.Score}; contributors: deep={x.DeepSleepContributor}, efficiency={x.EfficiencyContributor}, latency={x.LatencyContributor}, rem={x.RemSleepContributor}, restfulness={x.RestfulnessContributor}, timing={x.TimingContributor}, total={x.TotalSleepContributor}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.SleepSessions
+        rows.AddRange((await db.SleepSessions
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderByDescending(x => x.Type == "long_sleep")
             .ThenBy(x => x.BedtimeStart)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "sleep",
                 $"{x.Day:yyyy-MM-dd} / {x.Type ?? "unknown"} / {x.OuraId}",
                 $"bedtime_utc={x.BedtimeStart:u} - {x.BedtimeEnd:u}; avg_hrv={x.AverageHrv}; avg_hr={x.AverageHeartRate}; lowest_hr={x.LowestHeartRate}; deep_sec={x.DeepSleepDuration}; rem_sec={x.RemSleepDuration}; light_sec={x.LightSleepDuration}; awake_sec={x.AwakeTime}; hrv_ts={JsonTimestamp(x.HrvSeries)}; hr_ts={JsonTimestamp(x.HeartRateSeries)}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.DailyReadinesses
+        rows.AddRange((await db.DailyReadinesses
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.Id)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "daily_readiness",
                 $"{x.Day:yyyy-MM-dd} / {x.OuraId}",
                 $"score={x.Score}; temp_dev={x.TemperatureDeviation}; temp_trend={x.TemperatureTrendDeviation}; contributors: activity={x.ActivityBalanceContributor}, body_temp={x.BodyTemperatureContributor}, hrv={x.HrvBalanceContributor}, prev_day={x.PreviousDayActivityContributor}, prev_night={x.PreviousNightContributor}, recovery={x.RecoveryIndexContributor}, rhr={x.RestingHeartRateContributor}, sleep_balance={x.SleepBalanceContributor}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.DailyActivities
+        rows.AddRange((await db.DailyActivities
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.Id)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "daily_activity",
                 $"{x.Day:yyyy-MM-dd} / {x.OuraId}",
                 $"steps={x.Steps}; active_calories={x.ActiveCalories}; total_calories={x.TotalCalories}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.DailyStresses
+        rows.AddRange((await db.DailyStresses
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.Id)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "daily_stress",
                 $"{x.Day:yyyy-MM-dd} / {x.OuraId}",
                 $"stress_high={x.StressHigh}; recovery_high={x.RecoveryHigh}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.DailySpo2s
+        rows.AddRange((await db.DailySpo2s
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.Id)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "daily_spo2",
                 $"{x.Day:yyyy-MM-dd} / {x.OuraId}",
                 $"spo2_average={x.Spo2Average}; breathing_disturbance_index={x.BreathingDisturbanceIndex}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.DailyResilienceRecords
+        rows.AddRange((await db.DailyResilienceRecords
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.Id)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "daily_resilience",
                 $"{x.Day:yyyy-MM-dd} / {x.OuraId}",
                 $"level={x.Level}; sleep_recovery={x.SleepRecovery}; daytime_recovery={x.DaytimeRecovery}; stress={x.Stress}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
-        rows.AddRange(await db.Workouts
+        rows.AddRange((await db.Workouts
             .Where(x => x.UserId == user.Id && x.Day == day)
             .OrderBy(x => x.StartDatetime)
+            .ToListAsync(ct))
             .Select(x => new DbDebugRow(
                 "workout",
                 $"{x.Day:yyyy-MM-dd} / {x.Activity ?? "unknown"} / {x.OuraId}",
                 $"start_utc={x.StartDatetime:u}; end_utc={x.EndDatetime:u}; calories={x.Calories}; distance={x.Distance}; intensity={x.Intensity}; source={x.Source}",
-                x.RawJson.RootElement.ToString()))
-            .ToListAsync(ct));
+                x.RawJson.RootElement.ToString())));
 
         return rows.Select(r => r with { RawJson = Pretty(r.RawJson) }).ToList();
     }
@@ -176,7 +176,7 @@ public class DebugInvestigationService(
         var startLocal = day.ToDateTime(TimeOnly.MinValue);
         var endLocal = day.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
-        var rows = await db.WeatherHourlySamples
+        var entities = await db.WeatherHourlySamples
             .Include(x => x.WeatherLocation)
             .Include(x => x.WeatherStation)
             .Where(x => x.WeatherLocation.Name == config.LocationName
@@ -185,14 +185,14 @@ public class DebugInvestigationService(
             .OrderBy(x => x.TimestampUtc)
             .ThenBy(x => x.Source)
             .ThenBy(x => x.WeatherStationId)
-            .Select(x => new WeatherDbDebugRow(
-                x.Source,
-                $"{x.TimestampLocal:yyyy-MM-dd HH:mm} local / {x.TimestampUtc:u} / {(x.Model ?? (x.WeatherStation == null ? "no station" : x.WeatherStation.StationCode + " " + x.WeatherStation.ElementCode))}",
-                $"temp={x.TemperatureC}; rh={x.RelativeHumidityPct}; precipitation={x.PrecipitationMm}; pressure={x.PressureMslHpa}; wind={x.WindSpeedMs}; station={(x.WeatherStation == null ? "" : x.WeatherStation.Name)}",
-                x.RawJson.RootElement.ToString()))
             .ToListAsync(ct);
 
-        return rows.Select(r => r with { RawJson = Pretty(r.RawJson) }).ToList();
+        return entities.Select(x => new WeatherDbDebugRow(
+            x.Source,
+            $"{x.TimestampLocal:yyyy-MM-dd HH:mm} local / {x.TimestampUtc:u} / {(x.Model ?? (x.WeatherStation == null ? "no station" : x.WeatherStation.StationCode + " " + x.WeatherStation.ElementCode))}",
+            $"temp={x.TemperatureC}; rh={x.RelativeHumidityPct}; precipitation={x.PrecipitationMm}; pressure={x.PressureMslHpa}; wind={x.WindSpeedMs}; station={(x.WeatherStation == null ? "" : x.WeatherStation.Name)}",
+            Pretty(x.RawJson.RootElement.ToString())))
+            .ToList();
     }
 
     public async Task<List<LiveWeatherDebugRow>> FetchLiveWeatherRowsAsync(DateOnly day, CancellationToken ct = default)

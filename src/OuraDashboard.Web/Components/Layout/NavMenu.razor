@@ -1,6 +1,8 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject AppLogSink LogSink
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">OuraDashboard.Web</a>
+        <a class="navbar-brand" href="">OuraDashboard</a>
     </div>
 </div>
 
@@ -50,5 +52,26 @@
             </NavLink>
         </div>
 
+        @if (LogSink.ErrorCount > 0 || LogSink.WarningCount > 0)
+        {
+            <div class="nav-item px-3 mt-1">
+                <NavLink class="nav-link nav-link-alert" href="debug/investigate">
+                    ⚠
+                    @if (LogSink.ErrorCount > 0)
+                    {
+                        <span class="text-danger">@LogSink.ErrorCount error@(LogSink.ErrorCount != 1 ? "s" : "")</span>
+                    }
+                    @if (LogSink.WarningCount > 0)
+                    {
+                        <span class="text-warning ms-1">@LogSink.WarningCount warn@(LogSink.WarningCount != 1 ? "s" : "")</span>
+                    }
+                </NavLink>
+            </div>
+        }
+
+        <div class="nav-footer px-3 mt-auto">
+            <div class="small">v@(BuildInfo.Version)</div>
+            <div class="small">@(BuildInfo.BuildTime.ToString("yyyy-MM-dd HH:mm")) UTC</div>
+        </div>
     </nav>
 </div>

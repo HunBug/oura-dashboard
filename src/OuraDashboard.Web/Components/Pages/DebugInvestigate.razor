@@ -2,10 +2,66 @@
 @rendermode InteractiveServer
 
 @inject DebugInvestigationService DebugService
+@inject AppLogSink LogSink
 
 <PageTitle>Debug Investigate</PageTitle>
 
 <h4 class="mb-3">Debug Investigate</h4>
+
+@* ── Recent Warnings & Errors ──────────────────────────────────────────── *@
+<div class="mb-4">
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <h5 class="mb-0">Recent Warnings &amp; Errors</h5>
+        <span class="badge bg-danger">@LogSink.ErrorCount error@(LogSink.ErrorCount != 1 ? "s" : "")</span>
+        <span class="badge bg-warning text-dark">@LogSink.WarningCount warn@(LogSink.WarningCount != 1 ? "s" : "")</span>
+        <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => { LogSink.Clear(); }">Clear</button>
+    </div>
+
+    @{
+        var logEntries = LogSink.Entries;
+    }
+    @if (logEntries.Count == 0)
+    {
+        <p class="text-muted small mb-0">No warnings or errors captured since last restart.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover small mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:140px">Time (UTC)</th>
+                        <th style="width:80px">Level</th>
+                        <th style="width:220px">Category</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in logEntries.OrderByDescending(e => e.TimestampUtc))
+                    {
+                        <tr class="@(entry.Level >= LogLevel.Error ? "table-danger" : "table-warning")">
+                            <td class="font-monospace text-nowrap">@entry.TimestampUtc.ToString("HH:mm:ss")</td>
+                            <td><span class="badge @(entry.Level >= LogLevel.Error ? "bg-danger" : "bg-warning text-dark")">@entry.Level</span></td>
+                            <td class="text-truncate font-monospace" style="max-width:220px" title="@entry.Category">@ShortCategory(entry.Category)</td>
+                            <td>
+                                @entry.Message
+                                @if (entry.ExceptionText is not null)
+                                {
+                                    <details class="mt-1">
+                                        <summary class="text-muted">Exception details</summary>
+                                        <pre class="small mt-1 text-danger">@entry.ExceptionText</pre>
+                                    </details>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<hr class="mb-4" />
 
 <div class="row g-3 align-items-end mb-4">
     <div class="col-auto">
@@ -60,6 +116,7 @@
         }
         else
         {
+            <p class="text-muted small mb-2">@_storedRows.Count row@(_storedRows.Count != 1 ? "s" : "") across @_storedRows.Select(r => r.Endpoint).Distinct().Count() endpoint@(_storedRows.Select(r => r.Endpoint).Distinct().Count() != 1 ? "s" : "")</p>
             @foreach (var row in _storedRows)
             {
                 <details class="mb-3" open="@(row.Endpoint == "sleep")">
@@ -106,13 +163,17 @@
         }
         else
         {
-            @foreach (var row in _weatherStoredRows)
+            @foreach (var group in _weatherStoredRows.GroupBy(r => r.Source))
             {
-                <details class="mb-3">
-                    <summary class="fw-semibold">@row.Source <span class="text-muted fw-normal small">@row.Key</span></summary>
-                    <div class="small text-muted my-2">@row.Extracted</div>
-                    <textarea class="form-control font-monospace bg-body-secondary" rows="10" readonly>@row.RawJson</textarea>
-                </details>
+                <h6 class="mt-3 mb-1">@group.Key <span class="badge bg-secondary ms-1">@group.Count()</span></h6>
+                @foreach (var row in group)
+                {
+                    <details class="mb-3">
+                        <summary class="fw-semibold"><span class="text-muted fw-normal small">@row.Key</span></summary>
+                        <div class="small text-muted my-2">@row.Extracted</div>
+                        <textarea class="form-control font-monospace bg-body-secondary" rows="10" readonly>@row.RawJson</textarea>
+                    </details>
+                }
             }
         }
     </div>
@@ -234,5 +295,16 @@
         {
             _loadingWeatherLive = false;
         }
+    }
+
+    /// <summary>
+    /// Trims the fully-qualified logger category name to the last two segments
+    /// so it fits in the narrow table column.
+    /// e.g. "OuraDashboard.Sync.OuraSyncService" → "Sync.OuraSyncService"
+    /// </summary>
+    private static string ShortCategory(string category)
+    {
+        var parts = category.Split('.');
+        return parts.Length <= 2 ? category : string.Join(".", parts[^2..]);
     }
 }
