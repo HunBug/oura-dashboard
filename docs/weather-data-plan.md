@@ -7,6 +7,15 @@ Add historical weather data as a separate input stream for later comparison with
 
 Phase 1 is collection only. The UI, correlations, and statistical analysis come later.
 
+## Deployment Follow-up
+
+The current production deployment is Docker-based under `docker/oura-dashboard/`.
+
+- Use a mounted `/srv/oura-dashboard/appsettings.json` as `/app/appsettings.json` for app configuration, including Oura tokens, weather settings, sync intervals, timezone, and the Postgres connection string.
+- Keep compose environment overrides minimal; `.env` should only provide infrastructure values such as `DB_PASSWORD` for the Postgres container.
+- Persist ASP.NET Core Data Protection keys with `/srv/oura-dashboard/data-protection-keys:/home/app/.aspnet/DataProtection-Keys` to avoid antiforgery token failures after container replacement.
+- Re-check recent production logs after the compose change. Known recent entries were one `Antiforgery.DefaultAntiforgery` token deserialization error, one `Hosting.Diagnostics` warning about `HTTP_PORTS=8080` being overridden by `URLS=http://+:8085`, one unencrypted Data Protection key warning, and one non-persistent Data Protection key storage warning.
+
 ## Location
 
 Use a configurable point location instead of hard-coding a provider-specific station.

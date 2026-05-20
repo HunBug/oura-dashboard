@@ -31,7 +31,7 @@ USER app
 
 COPY --from=build --chown=app:app /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:8085
+ENV ASPNETCORE_HTTP_PORTS=8085
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8085
 

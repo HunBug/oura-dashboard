@@ -1,7 +1,8 @@
 # Server-side compose for oura-dashboard
 # Managed by lara — do not edit manually on the server
 #
-# Secrets come from .env (never committed — see .env.template)
+# App configuration and secrets come from mounted appsettings.json.
+# .env only supplies values needed by the postgres container itself.
 
 services:
   postgres:
@@ -24,22 +25,10 @@ services:
     restart: unless-stopped
     ports:
       - "8085:8085"
+    volumes:
+      - /srv/oura-dashboard/appsettings.json:/app/appsettings.json:ro
+      - /srv/oura-dashboard/data-protection-keys:/home/app/.aspnet/DataProtection-Keys
     environment:
-      # Connection string — points to the sibling postgres container
-      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=oura;Username=oura;Password=${DB_PASSWORD}"
-
-      # Oura personal access tokens (two users)
-      Oura__Users__0__Name: "Boo"
-      Oura__Users__0__Token: "${OURA_TOKEN_BOO:?OURA_TOKEN_BOO is required}"
-      Oura__Users__1__Name: "Maa"
-      Oura__Users__1__Token: "${OURA_TOKEN_MAA:?OURA_TOKEN_MAA is required}"
-
-      # Background sync intervals; set *_AUTO_SYNC_ENABLED=false to use manual sync only
-      Oura__SyncIntervalMinutes: "${OURA_SYNC_INTERVAL_MINUTES:-360}"
-      Oura__AutoSyncEnabled: "${OURA_AUTO_SYNC_ENABLED:-true}"
-      Weather__AutoSyncEnabled: "${WEATHER_AUTO_SYNC_ENABLED:-true}"
-      Weather__SyncIntervalHours: "${WEATHER_SYNC_INTERVAL_HOURS:-24}"
-      Oura__DisplayTimeZoneId: "Europe/Tallinn"
       TZ: "Europe/Tallinn"
     depends_on:
       postgres:

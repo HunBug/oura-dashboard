@@ -72,4 +72,6 @@ Background sync starts automatically unless disabled. Oura runs every 360 minute
 
 See [docs/architecture.md](docs/architecture.md) for the full design, configuration reference, API quirks, and deployment options.
 
+LLM integration is planned against the private Ollama sandbox at `http://neolinux:11434`; current notes live in [docs/ollama-llm-plan.md](docs/ollama-llm-plan.md).
+
 For LLM-assisted development, start new sessions with [docs/llm-context.md](docs/llm-context.md).

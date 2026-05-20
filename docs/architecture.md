@@ -90,6 +90,37 @@ Weather data intentionally keeps provider identity explicit. Open-Meteo model da
 
 ---
 
+## Planned LLM integration
+
+LLM features are planned but not implemented yet. The current target is the private Ollama sandbox at `http://neolinux:11434`, verified with `GET /api/tags` on 2026-05-20.
+
+The dashboard should call Ollama from server-side .NET services only. Browser/UI code should not know the Ollama host, model names, prompt templates, or raw request format.
+
+Expected future configuration:
+
+```json
+"Llm": {
+  "Enabled": true,
+  "BaseUrl": "http://neolinux:11434",
+  "Model": "llama3.1:8b",
+  "TimeoutSeconds": 60
+}
+```
+
+Planned service boundary:
+
+| Component | Responsibility |
+|---|---|
+| `LlmOptions` | Bind endpoint, model, timeout, and enabled flag. |
+| `ILlmClient` | Internal abstraction for prompt execution. |
+| `OllamaLlmClient` | Ollama-specific HTTP client for `/api/generate` or `/api/chat`. |
+| Domain LLM services | Build Oura/weather prompts and return typed app-level results. |
+| Optional persistence | Store prompt inputs, model/version, generated response, timestamps, and errors. |
+
+Current notes, model inventory, and implementation backlog live in `docs/ollama-llm-plan.md`.
+
+---
+
 ## Data layer (`OuraDashboard.Data`)
 
 ### Storage strategy
@@ -351,6 +382,24 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 - A second `docker-compose.full.yml` adds `web` and `sync` service containers.
 - Useful if moving to a dedicated home server where you don't want .NET SDK installed.
 
+### Production Docker notes
+
+Current server-side compose lives in `docker/oura-dashboard/`.
+
+- Mount `/srv/oura-dashboard/appsettings.json` into the web container as `/app/appsettings.json`; keep application settings and Oura tokens there instead of overriding nested config through compose environment variables.
+- Keep `.env` limited to values the infrastructure containers need directly, currently `DB_PASSWORD` for Postgres.
+- Persist ASP.NET Core Data Protection keys at `/srv/oura-dashboard/data-protection-keys` mounted to `/home/app/.aspnet/DataProtection-Keys`; otherwise antiforgery/cookie-protected payloads can become unreadable after container replacement.
+- Bind the app with `ASPNETCORE_HTTP_PORTS=8085` instead of `ASPNETCORE_URLS=http://+:8085` to avoid the .NET runtime warning about `HTTP_PORTS=8080` being overridden by `URLS`.
+
+Recent production warnings/errors to address or verify after deployment:
+
+| Time (UTC) | Level | Category | Message |
+|---|---|---|---|
+| 10:27:59 | Error | `Antiforgery.DefaultAntiforgery` | An exception was thrown while deserializing the token. Likely caused by missing/past Data Protection keys after a container restart or redeploy; old browser tokens may still fail once after the key-ring fix. |
+| 10:27:52 | Warning | `Hosting.Diagnostics` | `HTTP_PORTS '8080'` / `HTTPS_PORTS ''` overridden by `URLS 'http://+:8085'`; use `ASPNETCORE_HTTP_PORTS=8085`. |
+| 10:27:52 | Warning | `KeyManagement.XmlKeyManager` | No XML encryptor configured; Data Protection keys may be stored unencrypted. Decide whether host-directory permissions are sufficient for this small private deployment or add key encryption. |
+| 10:27:52 | Warning | `Repositories.FileSystemXmlRepository` | Data Protection keys are stored under `/home/app/.aspnet/DataProtection-Keys` inside the container and may not survive container destruction; mount a persistent key directory. |
+
 ---
 
 ## Configuration
@@ -416,7 +465,7 @@ Host=localhost;Port=5433;Database=oura;Username=oura;Password=...
 
 ### 🔲 Still to do
 
-- **Deployment**: systemd unit file + `docker-compose.full.yml` (web + sync in containers)
+- **Deployment**: systemd unit file + production Docker Compose cleanup. Use a mounted `appsettings.json`, persist Data Protection keys, avoid `ASPNETCORE_URLS`/`HTTP_PORTS` override warnings, and re-check the recent production antiforgery/Data Protection warnings.
 - **Custom metrics (trend layer)**: 7-day rolling averages on user overview; autonomic state trend line
 - **Weather trend diagrams/correlation**: weather-only charts and correlation tooling remain future work.
 
