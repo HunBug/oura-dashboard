@@ -17,4 +17,6 @@ public class OuraUser
     public List<DailySpo2> DailySpo2s { get; set; } = [];
     public List<DailyResilience> DailyResilienceRecords { get; set; } = [];
     public List<Workout> Workouts { get; set; } = [];
+    public List<LlmInteraction> LlmInteractions { get; set; } = [];
+    public List<LlmPrompt> LlmPrompts { get; set; } = [];
 }

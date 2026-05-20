@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 
 @inject DashboardQueryService Query
+@inject NightLlmService NightLlm
 @inject IJSRuntime JS
 @inject IOptions<OuraOptions> OuraOptions
 
@@ -63,6 +64,66 @@ else
         {
             <span class="btn btn-sm btn-outline-secondary disabled">Next night ›</span>
         }
+    </div>
+
+    @* ── LLM note ── *@
+    <div class="card mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div>
+                <span class="fw-semibold">LLM note</span>
+                @if (NightLlm.IsSandboxMode)
+                {
+                    <span class="badge ms-2 text-bg-warning text-dark">sandbox</span>
+                }
+                @if (_llmNote is not null)
+                {
+                    <span class="badge ms-2 @LlmStatusClass(_llmNote.Status)">@_llmNote.Status</span>
+                }
+                else if (!NightLlm.IsEnabled)
+                {
+                    <span class="badge ms-2 text-bg-secondary">disabled</span>
+                }
+            </div>
+            <button class="btn btn-sm btn-outline-primary"
+                    disabled="@(!NightLlm.IsEnabled || _generating || _metrics is null)"
+                    @onclick="GenerateLlmNote">
+                @(_generating ? "Generating..." : _llmNote?.Status == "succeeded" ? "Regenerate" : "Generate")
+            </button>
+        </div>
+        <div class="card-body">
+            @if (_llmNote is null)
+            {
+                <div class="text-muted small">
+                    @(NightLlm.IsEnabled
+                        ? NightLlm.IsSandboxMode ? "Sandbox mode — notes are not stored. Generate to see a response." : "No stored note yet."
+                        : "LLM generation is disabled in configuration.")
+                </div>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(_llmNote.ResponseText))
+                {
+                    <div style="white-space:pre-wrap;">@_llmNote.ResponseText</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(_llmNote.ErrorMessage))
+                {
+                    <div class="text-danger">@_llmNote.ErrorMessage</div>
+                }
+                else
+                {
+                    <div class="text-muted">Generation is running or has not produced output yet.</div>
+                }
+
+                <div class="text-muted small mt-3">
+                    @_llmNote.Model · @_llmNote.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                    @if (_llmNote.LatencyMs.HasValue)
+                    {
+                        <span> · @_llmNote.LatencyMs.Value ms</span>
+                    }
+                    <span> · @_llmNote.PromptKey</span>
+                </div>
+            }
+        </div>
     </div>
 
     @* ── Zone 2: Charts (before metric breakdown) ── *@
@@ -432,6 +493,8 @@ else
     private string? _copyStatus;
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
     private WeatherNightContext? _weatherContext;
+    private OuraDashboard.Data.Entities.LlmInteraction? _llmNote;
+    private bool _generating;
 
     private int?   RrsVal    => _metrics?.RealRecoveryScore;
     private string VerdictBg => RrsVal.HasValue
@@ -569,7 +632,13 @@ else
         {
             _metrics = NightMetricsCalculator.Compute(_detail);
             _llmText  = BuildLlmText(_detail, _displayTimeZone);
+            _llmNote = await NightLlm.GetLatestNoteAsync(UserName, day);
             _copyStatus = null;
+        }
+        else
+        {
+            _metrics = null;
+            _llmNote = null;
         }
 
         _loading = false;
@@ -593,6 +662,31 @@ else
             _copyStatus = $"Copy failed: {ex.Message}";
         }
     }
+
+    private async Task GenerateLlmNote()
+    {
+        if (_detail is null || _metrics is null || _generating)
+            return;
+
+        _generating = true;
+        try
+        {
+            _llmNote = await NightLlm.GenerateNightNoteAsync(_detail, _metrics, _weatherContext, forceNew: _llmNote is not null);
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+
+    private static string LlmStatusClass(string status) => status switch
+    {
+        "succeeded" => "text-bg-success",
+        "running" => "text-bg-info",
+        "timed_out" => "text-bg-warning",
+        "cancelled" => "text-bg-secondary",
+        _ => "text-bg-danger",
+    };
 
     // Encode a DateTimeOffset as "local wall-clock time treated as UTC" so ApexCharts
     // (which runs in datetimeUTC mode) displays the correct local HH:mm labels.

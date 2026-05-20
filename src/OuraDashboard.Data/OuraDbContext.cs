@@ -20,6 +20,8 @@ public class OuraDbContext(DbContextOptions<OuraDbContext> options) : DbContext(
     public DbSet<WeatherLocation> WeatherLocations => Set<WeatherLocation>();
     public DbSet<WeatherStation> WeatherStations => Set<WeatherStation>();
     public DbSet<WeatherHourlySample> WeatherHourlySamples => Set<WeatherHourlySample>();
+    public DbSet<LlmInteraction> LlmInteractions => Set<LlmInteraction>();
+    public DbSet<LlmPrompt> LlmPrompts => Set<LlmPrompt>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -181,6 +183,43 @@ public class OuraDbContext(DbContextOptions<OuraDbContext> options) : DbContext(
             e.Property(x => x.RawJson).HasColumnType("jsonb").IsRequired();
             e.HasOne(x => x.WeatherLocation).WithMany(x => x.HourlySamples).HasForeignKey(x => x.WeatherLocationId);
             e.HasOne(x => x.WeatherStation).WithMany(x => x.HourlySamples).HasForeignKey(x => x.WeatherStationId);
+        });
+
+        model.Entity<LlmInteraction>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.Scope, x.UserId, x.Day, x.CreatedAtUtc });
+            e.HasIndex(x => new { x.Scope, x.UserId, x.StartDay, x.EndDay, x.CreatedAtUtc });
+            e.HasIndex(x => new { x.InputHash, x.Status });
+            e.HasIndex(x => x.CreatedAtUtc);
+            e.Property(x => x.Scope).HasMaxLength(40).IsRequired();
+            e.Property(x => x.UserNameSnapshot).HasMaxLength(100);
+            e.Property(x => x.PromptKey).HasMaxLength(160).IsRequired();
+            e.Property(x => x.Model).HasMaxLength(120).IsRequired();
+            e.Property(x => x.Provider).HasMaxLength(40).IsRequired();
+            e.Property(x => x.ParametersJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.InputHash).HasMaxLength(128).IsRequired();
+            e.Property(x => x.InputJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.MessagesJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.ResponseJson).HasColumnType("jsonb");
+            e.Property(x => x.RawRequestJson).HasColumnType("jsonb");
+            e.Property(x => x.RawResponseJson).HasColumnType("jsonb");
+            e.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            e.Property(x => x.ErrorCode).HasMaxLength(80);
+            e.HasOne(x => x.User).WithMany(x => x.LlmInteractions).HasForeignKey(x => x.UserId);
+        });
+
+        model.Entity<LlmPrompt>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.Key, x.Scope, x.UserId, x.IsActive });
+            e.HasIndex(x => new { x.Key, x.Scope, x.UserId, x.Version }).IsUnique();
+            e.Property(x => x.Key).HasMaxLength(160).IsRequired();
+            e.Property(x => x.Scope).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(100);
+            e.Property(x => x.UpdatedBy).HasMaxLength(100);
+            e.HasOne(x => x.User).WithMany(x => x.LlmPrompts).HasForeignKey(x => x.UserId);
         });
     }
 }

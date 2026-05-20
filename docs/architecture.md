@@ -90,34 +90,63 @@ Weather data intentionally keeps provider identity explicit. Open-Meteo model da
 
 ---
 
-## Planned LLM integration
+## LLM Integration
 
-LLM features are planned but not implemented yet. The current target is the private Ollama sandbox at `http://neolinux:11434`, verified with `GET /api/tags` on 2026-05-20.
+The first LLM feature is implemented against the private Ollama sandbox at `http://neolinux:11434`, verified with `GET /api/tags` on 2026-05-20.
 
-The dashboard should call Ollama from server-side .NET services only. Browser/UI code should not know the Ollama host, model names, prompt templates, or raw request format.
+The dashboard calls Ollama from server-side .NET services only. Browser/UI code does not know the Ollama host, model names, prompt templates, or raw request format.
 
-Expected future configuration:
+Configuration:
 
 ```json
 "Llm": {
   "Enabled": true,
+  "SandboxMode": false,
   "BaseUrl": "http://neolinux:11434",
-  "Model": "llama3.1:8b",
-  "TimeoutSeconds": 60
+  "Model": "gemma4:e4b",
+  "Think": false,
+  "TimeoutSeconds": 90,
+  "ConnectTimeoutSeconds": 5,
+  "MaxConcurrentRequests": 1,
+  "NumPredict": 1000
 }
 ```
 
-Planned service boundary:
+Key flags:
+
+- `SandboxMode: true` — calls Ollama but writes no `LlmInteraction` rows. Use for prompt experimentation.
+- `Think: false` — disables the extended-thinking phase for models that support it (e.g. gemma4). **Required for small GPUs**: with thinking enabled, the model consumes all token budget on internal reasoning and returns empty `content`. Omit the key to let Ollama use the model default.
+- `NumPredict` — caps output tokens. 1000 is enough for concise health notes without thinking. If `Think: true`, set 3000+ and raise `TimeoutSeconds` accordingly (thinking alone can consume 700+ tokens before any content is written).
+
+Implemented service boundary:
 
 | Component | Responsibility |
 |---|---|
-| `LlmOptions` | Bind endpoint, model, timeout, and enabled flag. |
-| `ILlmClient` | Internal abstraction for prompt execution. |
-| `OllamaLlmClient` | Ollama-specific HTTP client for `/api/generate` or `/api/chat`. |
-| Domain LLM services | Build Oura/weather prompts and return typed app-level results. |
-| Optional persistence | Store prompt inputs, model/version, generated response, timestamps, and errors. |
+| `LlmOptions` | Bind endpoint, model, timeout, enabled, sandbox, think, and generation flags. |
+| `ILlmClient` | Internal abstraction for chat execution. |
+| `OllamaLlmClient` | Ollama-specific HTTP client for `/api/chat` with `stream: false`. |
+| `LlmConcurrencyLimiter` | Limits local model load with `Llm:MaxConcurrentRequests`. |
+| `LlmRequestStore` | Stores and updates production interaction rows. |
+| `LlmDebugLog` | Singleton ring buffer (last 3 calls) — full prompts and raw JSON, in memory only. |
+| `NightLlmService` | Builds compact night-summary input from typed Oura/weather data. Skips DB writes when `SandboxMode` is on. |
 
-Current notes, model inventory, and implementation backlog live in `docs/ollama-llm-plan.md`.
+Implemented persistence:
+
+| Table | Purpose |
+|---|---|
+| `LlmInteractions` | Production request/response/error history, including input JSON, messages JSON, raw Ollama payloads, status, latency, model, provider, and prompt key/version. |
+| `LlmPrompts` | Versioned prompt storage reserved for future DB-backed prompt overrides. |
+
+Current UI:
+
+- `/night/{name}/{day}` has an "LLM note" panel. Shows a **sandbox** badge when `SandboxMode` is on.
+- `Generate` creates or reuses a recent matching interaction (skipped in sandbox mode).
+- `Regenerate` forces a new interaction row (skipped in sandbox mode).
+- Disabled/offline/timeout/error states are shown without breaking the page.
+- `/debug/llm-sandbox` shows the last 3 LLM calls from `LlmDebugLog` with full prompt text and raw Ollama JSON.
+
+Actual implementation notes live in `docs/ollama-implementation-plan.md`. The
+original model inventory and broader backlog remain in `docs/ollama-llm-plan.md`.
 
 ---
 
@@ -230,6 +259,7 @@ Charts are rendered with **Blazor-ApexCharts 6.1.0** (C#-native, no manual JS in
 | `/sync` | `Sync.razor` | ✅ Live sync state (2-second poll), per-user result counts, refresh/reload buttons, DB totals for Oura/weather with pressure/sun counts, weather context diagnostics |
 | `/metrics` | `MetricsGuide.razor` | ⚠️ Removed from nav (Step 1). Content dissolved into `MetricHelp.razor` `?` popovers (Step 7). Page still exists at `/metrics` as a reference; not linked from primary nav. |
 | `/debug/investigate` | `DebugInvestigate.razor` | ✅ Warning/Error log viewer (live from `AppLogSink`, clearable) + raw DB row inspector (per user/day, grouped by endpoint and source) |
+| `/debug/llm-sandbox` | `LlmSandbox.razor` | ✅ Last 3 LLM calls from `LlmDebugLog`: response text, prompts sent, raw Ollama request/response JSON. Works in both sandbox and live mode. |
 
 
 

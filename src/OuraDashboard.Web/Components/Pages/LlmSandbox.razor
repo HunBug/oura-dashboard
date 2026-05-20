@@ -1,0 +1,193 @@
+@page "/debug/llm-sandbox"
+@rendermode InteractiveServer
+
+@using System.Text.Json
+@inject LlmDebugLog DebugLog
+@inject NightLlmService NightLlm
+@inject IOptions<LlmOptions> LlmOptions
+
+<PageTitle>LLM Sandbox</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <h4 class="mb-0">LLM Sandbox</h4>
+    @if (!LlmOptions.Value.Enabled)
+    {
+        <span class="badge text-bg-secondary">disabled</span>
+    }
+    else if (NightLlm.IsSandboxMode)
+    {
+        <span class="badge text-bg-warning text-dark">sandbox — no DB writes</span>
+    }
+    else
+    {
+        <span class="badge text-bg-success">live — DB writes enabled</span>
+    }
+    <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="Refresh">Refresh</button>
+</div>
+
+<p class="text-muted small mb-4">
+    Shows the last 3 LLM calls made in this server session (in-memory, not stored in DB).
+    Use <a href="/night/Boo/2026-05-19">/night/{name}/{day}</a> to trigger a generation, then come back here.
+</p>
+
+@if (!LlmOptions.Value.Enabled)
+{
+    <div class="alert alert-secondary">LLM is disabled. Set <code>Llm.Enabled = true</code> in your local settings to use it.</div>
+}
+
+@{
+    var entries = _entries;
+}
+
+@if (entries.Count == 0)
+{
+    <p class="text-muted">No LLM calls recorded yet this session. Trigger a generation from any night detail page.</p>
+}
+else
+{
+    @foreach (var (entry, index) in entries.Select((e, i) => (e, i)))
+    {
+        var idx = index;
+        <div class="card mb-4 @(entry.IsSandbox ? "border-warning" : "")">
+            <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-semibold">#@(entries.Count - idx)</span>
+                <span class="text-muted small">@entry.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span>
+                <span class="badge text-bg-secondary">@entry.Scope</span>
+                <span class="badge text-bg-primary">@entry.Model</span>
+                @if (entry.IsSandbox)
+                {
+                    <span class="badge text-bg-warning text-dark">sandbox</span>
+                }
+                @if (entry.LatencyMs.HasValue)
+                {
+                    <span class="text-muted small ms-auto">@entry.LatencyMs ms</span>
+                }
+                @if (entry.ErrorCode is not null)
+                {
+                    <span class="badge text-bg-danger">@entry.ErrorCode</span>
+                }
+            </div>
+
+            <div class="card-body p-0">
+
+                @* ── Response text ── *@
+                <div class="p-3 border-bottom">
+                    <div class="fw-semibold small text-muted mb-1">Response</div>
+                    @if (!string.IsNullOrWhiteSpace(entry.ResponseText))
+                    {
+                        <div style="white-space:pre-wrap;" class="small">@entry.ResponseText</div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(entry.ErrorMessage))
+                    {
+                        <div class="text-danger small">@entry.ErrorMessage</div>
+                    }
+                    else
+                    {
+                        <div class="text-muted small">No response.</div>
+                    }
+                </div>
+
+                @* ── Messages (prompts) ── *@
+                <div class="p-3 border-bottom">
+                    <button class="btn btn-sm btn-link p-0 text-decoration-none fw-semibold small text-muted"
+                            @onclick="() => ToggleSection(idx, 0)">
+                        @(IsOpen(idx, 0) ? "▾" : "▸") Prompts sent (@(CountMessages(entry.MessagesJson)) messages)
+                    </button>
+                    @if (IsOpen(idx, 0))
+                    {
+                        <div class="mt-2">
+                            @foreach (var msg in ParseMessages(entry.MessagesJson))
+                            {
+                                <div class="mb-3">
+                                    <div class="badge text-bg-secondary mb-1">@msg.Role</div>
+                                    <pre class="small bg-light p-2 rounded mb-0" style="white-space:pre-wrap;word-break:break-word;">@msg.Content</pre>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @* ── Raw Ollama request ── *@
+                @if (entry.RawRequestJson is not null)
+                {
+                    <div class="p-3 border-bottom">
+                        <button class="btn btn-sm btn-link p-0 text-decoration-none fw-semibold small text-muted"
+                                @onclick="() => ToggleSection(idx, 1)">
+                            @(IsOpen(idx, 1) ? "▾" : "▸") Raw Ollama request JSON
+                        </button>
+                        @if (IsOpen(idx, 1))
+                        {
+                            <pre class="small bg-light p-2 rounded mt-2 mb-0" style="white-space:pre-wrap;word-break:break-word;">@PrettyJson(entry.RawRequestJson)</pre>
+                        }
+                    </div>
+                }
+
+                @* ── Raw Ollama response ── *@
+                @if (entry.RawResponseJson is not null)
+                {
+                    <div class="p-3">
+                        <button class="btn btn-sm btn-link p-0 text-decoration-none fw-semibold small text-muted"
+                                @onclick="() => ToggleSection(idx, 2)">
+                            @(IsOpen(idx, 2) ? "▾" : "▸") Raw Ollama response JSON
+                        </button>
+                        @if (IsOpen(idx, 2))
+                        {
+                            <pre class="small bg-light p-2 rounded mt-2 mb-0" style="white-space:pre-wrap;word-break:break-word;">@PrettyJson(entry.RawResponseJson)</pre>
+                        }
+                    </div>
+                }
+
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private IReadOnlyList<LlmDebugEntry> _entries = [];
+
+    // [entryIndex][sectionIndex] → open?
+    private readonly Dictionary<(int, int), bool> _open = new();
+
+    protected override void OnInitialized() => _entries = DebugLog.GetRecent();
+
+    private void Refresh() => _entries = DebugLog.GetRecent();
+
+    private void ToggleSection(int entry, int section)
+    {
+        var key = (entry, section);
+        _open[key] = !_open.GetValueOrDefault(key);
+    }
+
+    private bool IsOpen(int entry, int section) => _open.GetValueOrDefault((entry, section));
+
+    private static IReadOnlyList<(string Role, string Content)> ParseMessages(string json)
+    {
+        try
+        {
+            var msgs = JsonSerializer.Deserialize<JsonElement[]>(json);
+            if (msgs is null) return [];
+            return msgs
+                .Select(m => (
+                    Role: m.TryGetProperty("role", out var r) ? r.GetString() ?? "" : "",
+                    Content: m.TryGetProperty("content", out var c) ? c.GetString() ?? "" : ""))
+                .ToList();
+        }
+        catch { return []; }
+    }
+
+    private static int CountMessages(string json)
+    {
+        try { return JsonSerializer.Deserialize<JsonElement[]>(json)?.Length ?? 0; }
+        catch { return 0; }
+    }
+
+    private static string PrettyJson(string json)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch { return json; }
+    }
+}

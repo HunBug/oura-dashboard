@@ -79,6 +79,7 @@ dotnet test tests/OuraDashboard.Tests
 | `/raw` | `Raw.razor` — raw JSON export |
 | `/metrics` | `MetricsGuide.razor` — custom metric explanations |
 | `/debug/investigate` | `DebugInvestigate.razor` — Warning/Error log viewer (from `AppLogSink`) + raw DB row inspector |
+| `/debug/llm-sandbox` | `LlmSandbox.razor` — last 3 LLM calls from `LlmDebugLog`: prompts + raw Ollama JSON, in memory only |
 
 ## Custom metrics (NightMetrics.cs)
 

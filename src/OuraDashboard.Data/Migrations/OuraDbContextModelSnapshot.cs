@@ -790,6 +790,195 @@ namespace OuraDashboard.Data.Migrations
                     b.ToTable("Workouts");
                 });
 
+            modelBuilder.Entity("OuraDashboard.Data.Entities.LlmInteraction", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CompletionTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("Day")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EndDay")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InputHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("InputJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int?>("LatencyMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MessagesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("ParametersJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("PromptKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<int?>("PromptTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PromptVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("RawRequestJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("RawResponseJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ResponseJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ResponseText")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("StartDay")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserNameSnapshot")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("InputHash", "Status");
+
+                    b.HasIndex("Scope", "UserId", "Day", "CreatedAtUtc");
+
+                    b.HasIndex("Scope", "UserId", "StartDay", "EndDay", "CreatedAtUtc");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("LlmInteractions");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.LlmPrompt", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key", "Scope", "UserId", "IsActive");
+
+                    b.HasIndex("Key", "Scope", "UserId", "Version")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("LlmPrompts");
+                });
+
             modelBuilder.Entity("OuraDashboard.Data.Entities.DailyActivity", b =>
                 {
                     b.HasOne("OuraDashboard.Data.Entities.OuraUser", "User")
@@ -889,6 +1078,24 @@ namespace OuraDashboard.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("OuraDashboard.Data.Entities.LlmInteraction", b =>
+                {
+                    b.HasOne("OuraDashboard.Data.Entities.OuraUser", "User")
+                        .WithMany("LlmInteractions")
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("OuraDashboard.Data.Entities.LlmPrompt", b =>
+                {
+                    b.HasOne("OuraDashboard.Data.Entities.OuraUser", "User")
+                        .WithMany("LlmPrompts")
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("OuraDashboard.Data.Entities.Vo2Max", b =>
                 {
                     b.HasOne("OuraDashboard.Data.Entities.OuraUser", "User")
@@ -956,6 +1163,10 @@ namespace OuraDashboard.Data.Migrations
                     b.Navigation("DailyStresses");
 
                     b.Navigation("HeartRateSamples");
+
+                    b.Navigation("LlmInteractions");
+
+                    b.Navigation("LlmPrompts");
 
                     b.Navigation("SleepSessions");
 

@@ -3,8 +3,13 @@
 Last updated: 2026-05-20
 
 This document is the planning and brainstorming record for adding a private
-Ollama-backed LLM module to the Oura dashboard. It is intentionally design-level:
-no implementation has been done yet.
+Ollama-backed LLM module to the Oura dashboard. It is intentionally design-level.
+
+Implementation status: the first production slice has been implemented as of
+2026-05-20: server-side Ollama `/api/chat` client, `LlmInteractions` and
+`LlmPrompts` persistence, and a generated "LLM note" panel on
+`/night/{name}/{day}`. See `docs/ollama-implementation-plan.md` for the actual
+current state, files, verification, and follow-up list.
 
 ## Current environment
 

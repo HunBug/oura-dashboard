@@ -109,12 +109,14 @@ No DB queries, no DI. Fields:
 - Both require at least 70% hourly coverage; otherwise show `insufficient data`.
 - `/night` and home show numeric chips; home/user/compare charts show `P/D/S` annotation lanes.
 
-**Planned Ollama/LLM integration** — not implemented yet.
+**Ollama/LLM integration** — first production slice implemented.
 - Private Ollama sandbox is reachable at `http://neolinux:11434`; `GET /api/tags` was verified on 2026-05-20.
 - Available models include `llama3.1:8b`, `qwen3.6:27b`, `gemma4:26b`, `gemma4:e4b`, `ministral-3b:latest`, and `huihui-ministral-3b:latest`.
-- Expected config shape: `Llm:Enabled`, `Llm:BaseUrl`, `Llm:Model`, `Llm:TimeoutSeconds`.
-- Keep implementation behind server-side services such as `ILlmClient` / `OllamaLlmClient`; Razor pages should call domain services, not Ollama directly.
-- Detailed notes and first implementation candidate: `docs/ollama-llm-plan.md`.
+- Config shape is documented in `appsettings.example.json` under `Llm`; local/prod should set `Llm:Enabled=true`, `BaseUrl`, and `Model`.
+- Server-side services live under `src/OuraDashboard.Web/Services/Llm/`; Razor pages call domain services such as `NightLlmService`, not Ollama directly.
+- Persistence is implemented with `LlmInteractions` and `LlmPrompts` via migration `20260520120000_AddLlmPersistence`.
+- `/night/{name}/{day}` has an "LLM note" panel that stores generated notes, failure states, model, prompt key, timestamp, and latency.
+- Current implementation/state notes: `docs/ollama-implementation-plan.md`; broader design backlog: `docs/ollama-llm-plan.md`.
 
 ## Non-obvious rules & gotchas
 
@@ -147,6 +149,10 @@ dotnet test tests/OuraDashboard.Tests
 
 # Build everything
 dotnet build
+
+# EF CLI setup for migration generation
+dotnet tool restore
+dotnet tool run dotnet-ef --version
 ```
 
 ## What's left to build
@@ -154,12 +160,13 @@ dotnet build
 - **Deployment artifacts**: production Docker compose/systemd cleanup. Current production is Docker under `docker/oura-dashboard/`; use mounted `/srv/oura-dashboard/appsettings.json` instead of nested compose environment overrides, persist `/home/app/.aspnet/DataProtection-Keys`, and avoid the `ASPNETCORE_URLS` vs `HTTP_PORTS=8080` warning by using `ASPNETCORE_HTTP_PORTS=8085`.
 - **Production warnings to verify**: recent logs showed one antiforgery token deserialization error, one HTTP port override warning, one unencrypted Data Protection key warning, and one non-persistent Data Protection key warning.
 - **Trend layer on UserDetail**: 7-day rolling averages for HRV and HR; autonomic state trend line
-- **LLM integration**: add Ollama-backed server-side LLM service, prompt templates, first night-summary feature, and decide whether generated responses should be persisted.
+- **LLM follow-ups**: add `/debug/llm-sandbox`, LLM diagnostics on `/sync`, DB-backed prompt resolver/management UI, and later trend summaries.
 
 ## Files to read for deeper context
 
 - `docs/architecture.md` — full schema, service descriptions, API endpoint list, deployment options
-- `docs/ollama-llm-plan.md` — current Ollama endpoint, models, planned LLM service boundary, and implementation notes
+- `docs/ollama-implementation-plan.md` — actual implemented LLM state, files, config, verification, and follow-ups
+- `docs/ollama-llm-plan.md` — original Ollama endpoint, models, design boundary, and backlog
 - `src/OuraDashboard.Web/Services/NightMetrics.cs` — custom metric logic
 - `src/OuraDashboard.Web/Services/DashboardQueryService.cs` — all DB query shapes
 - `src/OuraDashboard.Web/Components/Pages/Home.razor` — most complex page

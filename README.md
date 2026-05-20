@@ -24,6 +24,8 @@ Private Oura Ring data dashboard for a home server. Pulls raw data from the Oura
 | `/sync` | Live sync status (2s poll), per-user result counts, manual refresh/reload buttons, DB totals, weather context diagnostics |
 | `/raw` | Raw JSON export: user + date-range + endpoint selector, copy-to-clipboard |
 | `/metrics` | Metrics guide: explanation of every custom metric (not linked from main nav) |
+| `/debug/investigate` | Warning/Error log viewer + raw DB row inspector |
+| `/debug/llm-sandbox` | Last 3 LLM calls: full prompts sent and raw Ollama JSON, in-memory only |
 
 ## Quick start
 
@@ -72,6 +74,6 @@ Background sync starts automatically unless disabled. Oura runs every 360 minute
 
 See [docs/architecture.md](docs/architecture.md) for the full design, configuration reference, API quirks, and deployment options.
 
-LLM integration is planned against the private Ollama sandbox at `http://neolinux:11434`; current notes live in [docs/ollama-llm-plan.md](docs/ollama-llm-plan.md).
+LLM integration (Slices 1–4) is implemented against the private Ollama instance at `http://neolinux:11434`. `/night/{name}/{day}` generates persisted Ollama-backed notes when `Llm:Enabled=true`. Set `Llm:SandboxMode=true` to call Ollama without writing any DB rows — useful for prompt experimentation. `/debug/llm-sandbox` shows the last 3 LLM calls (full prompts + raw JSON) from the current session. Current implementation state lives in [docs/ollama-implementation-plan.md](docs/ollama-implementation-plan.md); the broader design backlog lives in [docs/ollama-llm-plan.md](docs/ollama-llm-plan.md).
 
 For LLM-assisted development, start new sessions with [docs/llm-context.md](docs/llm-context.md).
