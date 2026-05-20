@@ -4,6 +4,6 @@
     <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
 
     <!-- Bump this before every release. push.sh enforces no re-tag without the force flag -->
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 </Project>

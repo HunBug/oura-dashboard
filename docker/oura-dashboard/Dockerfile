@@ -26,6 +26,8 @@ RUN dotnet publish src/OuraDashboard.Web/OuraDashboard.Web.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+
 # Use the built-in non-root user that ships with the .NET runtime image
 USER app
 
